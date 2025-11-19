@@ -105,7 +105,8 @@ class DashboardController extends Controller
                     MONTH(d.damaged_date) AS month,
                     SUM(d.damaged_quantity * p.selling_price) AS total_loss
                 FROM damaged_items d
-                JOIN products p ON d.prod_code = p.prod_code
+                Join inventory i on i.inven_code = d.inven_code
+                JOIN products p ON i.prod_code = p.prod_code
                 WHERE d.owner_id = ? AND YEAR(d.damaged_date) = ?
                 GROUP BY MONTH(d.damaged_date)
             ) l ON m.month = l.month
@@ -180,7 +181,8 @@ class DashboardController extends Controller
                     MONTH(d.damaged_date) AS month,
                     SUM(d.damaged_quantity * p.selling_price) AS total_loss
                 FROM damaged_items d
-                JOIN products p ON d.prod_code = p.prod_code
+                Join inventory i on i.inven_code = d.inven_code
+                JOIN products p ON i.prod_code = p.prod_code
                 WHERE d.owner_id = ? AND YEAR(d.damaged_date) = ?
                 GROUP BY MONTH(d.damaged_date)
             ) l ON m.month = l.month
@@ -326,6 +328,63 @@ class DashboardController extends Controller
 
         $categories = array_map(fn($row) => $row->category, $productCategory);
 
+
+
+
+        $stockAlert = DB::select("
+            SELECT p.name AS prod_name, p.prod_image, p.stock_limit,
+                
+                SUM(i.stock) AS total_stock,
+                
+                -- Usable stock (not expired)
+                SUM(CASE 
+                    WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
+                    THEN i.stock 
+                    ELSE 0 
+                END) AS remaining_stock,
+                
+                -- Expired stock
+                SUM(CASE 
+                    WHEN i.expiration_date <= CURDATE() 
+                    THEN i.stock 
+                    ELSE 0 
+                END) AS expired_stock,
+                
+                CASE
+                    WHEN SUM(CASE 
+                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
+                        THEN i.stock 
+                        ELSE 0 
+                    END) = 0 THEN 'Critical'
+                    WHEN SUM(CASE 
+                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
+                        THEN i.stock 
+                        ELSE 0 
+                    END) <= 3 THEN 'Critical'
+                    WHEN SUM(CASE 
+                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
+                        THEN i.stock 
+                        ELSE 0 
+                    END) <= p.stock_limit THEN 'Reorder'
+                    ELSE 'Normal'
+                END AS status
+                
+            FROM products p
+            JOIN inventory i ON p.prod_code = i.prod_code
+            WHERE p.owner_id = ?
+                AND p.prod_status = 'active'
+            GROUP BY p.prod_code, p.name, p.stock_limit, p.prod_image
+            HAVING status IN ('Critical', 'Reorder')
+            ORDER BY remaining_stock ASC
+        ", [$owner_id]);
+
+
+
+        $stockAlert = collect($stockAlert)->map(function ($item) {
+            $item->image_url = asset('storage/' . ltrim($item->prod_image, '/'));
+            return $item;
+        });
+
         return response()->json([
             'success' => true,
             'owner_name' => $owner_name,
@@ -348,6 +407,8 @@ class DashboardController extends Controller
             'productsPrev' => $productPrevData,
             'productsAve'=> $productsAveData,
             'categories' => $categories,
+
+            'stockAlert' => $stockAlert,
         ]);
     }
 }

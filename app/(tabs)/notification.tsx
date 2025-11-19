@@ -327,7 +327,7 @@ export default function NotificationScreen() {
 
       {/* Notification Detail Modal */}
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={closeModal}
