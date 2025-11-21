@@ -1,9 +1,9 @@
 // app/(tabs)/_layout.tsx
-import React, { useEffect, useState, useRef } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { View, TouchableOpacity, Text, Alert } from "react-native";
-import { useRouter, Tabs } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Tabs, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert, Text, TouchableOpacity, View } from "react-native";
 
 export default function TabsLayout() {
   const router = useRouter();
@@ -43,7 +43,7 @@ export default function TabsLayout() {
       if (!userEmail) return;
 
       const response = await fetch(
-        `http://192.168.100.20:8000/api/notifications?email=${userEmail}&filter=all`
+        `http://10.193.54.243:8000/api/notifications?email=${userEmail}&filter=all`
       );
 
       const data = await response.json();

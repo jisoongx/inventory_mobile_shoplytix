@@ -1,9 +1,9 @@
 // app/(tabs)/notification.tsx
-import { View, Text, FlatList, ActivityIndicator, Alert, RefreshControl, TouchableOpacity, Modal, ScrollView } from "react-native";
-import { useLocalSearchParams, useFocusEffect } from "expo-router";
-import { useState, useEffect, useCallback, useRef } from "react";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, FlatList, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 export default function NotificationScreen() {
   const params = useLocalSearchParams();
@@ -55,7 +55,7 @@ export default function NotificationScreen() {
       }
 
       const response = await fetch(
-        `http://192.168.100.20:8000/api/notifications?email=${email}&filter=${filter}`
+        `http://10.193.54.243:8000/api/notifications?email=${email}&filter=${filter}`
       );
 
       const data = await response.json();
@@ -89,7 +89,7 @@ export default function NotificationScreen() {
       }
 
       const response = await fetch(
-        `http://192.168.100.20:8000/api/notifications/${notification.notif_id}/read`,
+        `http://10.193.54.243:8000/api/notifications/${notification.notif_id}/read`,
         {
           method: 'POST',
           headers: {

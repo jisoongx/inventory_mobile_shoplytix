@@ -1,21 +1,20 @@
-import React, { useEffect, useState, useRef } from "react";
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  StyleSheet, 
-  ActivityIndicator, 
-  Alert, 
-  Dimensions, 
-  TouchableOpacity, 
-  SafeAreaView,
-  Image,
-  AppState
-} from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LineChart } from "react-native-chart-kit";
 import { Picker } from '@react-native-picker/picker';
-import { useRouter } from 'expo-router';
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  Dimensions,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+import { LineChart } from "react-native-chart-kit";
 
 export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
@@ -49,7 +48,7 @@ export default function DashboardScreen() {
         return;
       }
 
-      const url = `http://192.168.100.20:8000/api/dashboard?owner_id=${ownerId}&year=${selectedYear}`;
+      const url = `http://10.193.54.243:8000/api/dashboard?owner_id=${ownerId}&year=${selectedYear}`;
       
       if (!silent) {
         console.log('Fetching URL:', url);
@@ -127,7 +126,7 @@ export default function DashboardScreen() {
       const ownerId = await AsyncStorage.getItem('owner_id');
       
       const response = await fetch(
-        `http://192.168.100.20:8000/api/dashboard?owner_id=${ownerId}&year=${year}`
+        `http://10.193.54.243:8000/api/dashboard?owner_id=${ownerId}&year=${year}`
       );
       
       const data = await response.json();

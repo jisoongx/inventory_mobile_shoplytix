@@ -1,8 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   AppState,
   Dimensions,
@@ -13,7 +11,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { LineChart } from "react-native-chart-kit";
 
 export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
@@ -214,22 +211,22 @@ export default function DashboardScreen() {
     fetchChartData(year);
   };
 
-  if (loading) {
-    return (
-      <View style={headerStyle.center}>
-        <ActivityIndicator size="large" color="#b91c1c" />
-        <Text>Loading dashboard...</Text>
-      </View>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <View style={styles.center}>
+  //       <ActivityIndicator size="large" color="#b91c1c" />
+  //       <Text>Loading dashboard...</Text>
+  //     </View>
+  //   );
+  // }
 
-  if (!dashboardData) {
-    return (
-      <View style={headerStyle.center}>
-        <Text style={{ color: "red" }}>No dashboard data available.</Text>
-      </View>
-    );
-  }
+  // if (!dashboardData) {
+  //   return (
+  //     <View style={styles.center}>
+  //       <Text style={{ color: "red" }}>No dashboard data available.</Text>
+  //     </View>
+  //   );
+  // }
 
   const formatCurrency = (amount: number | null) => {
     if (amount === null || amount === 0) return '₱0.00';
@@ -306,223 +303,196 @@ export default function DashboardScreen() {
     }
   };
 
-  return (
-    <SafeAreaView style={headerStyle.safeArea}>
-      <ScrollView style={headerStyle.container}>
+return (
+  <SafeAreaView style={headerStyle.safeArea}>
+    <ScrollView style={headerStyle.container}>
 
-        <View style={headerStyle.tabButtonContainer}>
-          <TouchableOpacity
-            style={[headerStyle.tabButton, activeTab === "overview" && headerStyle.tabButtonActive]}
-            onPress={() => setActiveTab("overview")}
+      <View style={headerStyle.tabButtonContainer}>
+        <TouchableOpacity
+          style={[headerStyle.tabButton, activeTab === "overview" && headerStyle.tabButtonActive]}
+          onPress={() => setActiveTab("overview")}
+        >
+          <Text style={[headerStyle.tabButtonText, activeTab === "overview" && headerStyle.tabButtonTextActive]}>
+            Overview
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[headerStyle.tabButton, activeTab === "reports" && headerStyle.tabButtonActive]}
+          onPress={() => setActiveTab("reports")}
+        >
+          <Text style={[headerStyle.tabButtonText, activeTab === "reports" && headerStyle.tabButtonTextActive]}>
+            Reports
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === "overview" ? (
+        <View>
+          <Text style={headerStyle.dateText}>{dateDisplay}</Text>
+          <Text style={headerStyle.welcome}>Welcome, {owner_name}!</Text>
+
+          {/* currency dapit */}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={headerStyle.salesScrollContainer}
           >
-            <Text style={[headerStyle.tabButtonText, activeTab === "overview" && headerStyle.tabButtonTextActive]}>
-              Overview
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[headerStyle.tabButton, activeTab === "reports" && headerStyle.tabButtonActive]}
-            onPress={() => setActiveTab("reports")}
-          >
-            <Text style={[headerStyle.tabButtonText, activeTab === "reports" && headerStyle.tabButtonTextActive]}>
-              Reports
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === "overview" ? (
-          <View>
-            <Text style={headerStyle.dateText}>{dateDisplay}</Text>
-            <Text style={headerStyle.welcome}>Welcome, {owner_name}!</Text>
-
-            {/* currency dapit */}
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={headerStyle.salesScrollContainer}
-            >
-              <View style={[headerStyle.card, headerStyle.cardRed]}>
-                <View style={headerStyle.cardGradientOverlay} />
-                <Text style={headerStyle.salesValueBig}>
-                  ₱{Number(dailySales).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </Text>
-                <Text style={headerStyle.salesLabel}>Daily Sales</Text>
-                <View style={headerStyle.cardDecoration} />
-              </View>
-
-              <View style={[headerStyle.card, headerStyle.cardOrange]}>
-                <View style={headerStyle.cardGradientOverlay} />
-                <Text style={headerStyle.salesValue}>
-                  ₱{(Number(weeklySales) / 1000).toFixed(1)}k
-                </Text>
-                <Text style={headerStyle.salesLabel}>Last 7 Days</Text>
-                <View style={headerStyle.cardDecoration} />
-              </View>
-
-              <View style={[headerStyle.card, headerStyle.cardGreen]}>
-                <View style={headerStyle.cardGradientOverlay} />
-                <Text style={headerStyle.salesValue}>
-                  ₱{(Number(monthSales) / 1000).toFixed(1)}k
-                </Text>
-                <Text style={headerStyle.salesLabel}>This Month's Sales</Text>
-                <View style={headerStyle.cardDecoration} />
-              </View>
-            </ScrollView>
-          
-            <View style={profitStyle.profitCardContainer}>
-              <Text style={profitStyle.profitCardHeader}>Monthly Net Profit</Text>
-              <View style={profitStyle.profitCardContent}>
-                <View style={profitStyle.profitDateContainer}>
-                  <Text style={profitStyle.profitMonthYear}>{month}</Text>
-                  <Text style={profitStyle.profitDayDate}>{day}</Text>
-                </View>
-
-                <View style={profitStyle.profitAmountContainer}>
-                  {profitMonth === null || profitMonth === 0 ? (
-                    <Text style={profitStyle.profitEmptyText}>0.00</Text>
-                  ) : (
-                    <Text style={profitStyle.profitAmount}>
-                      {formatCurrency(profitMonth)}
-                    </Text>
-                  )}
-                  <Text style={profitStyle.profitAmountLabel}>Current Net Profit</Text>
-                </View>
-
-                <View style={profitStyle.profitActionsContainer}>
-                  <View style={profitStyle.profitYearPickerContainer}>
-                    <Picker
-                      selectedValue={selectedYear}
-                      onValueChange={handleYearChange}
-                      style={profitStyle.profitYearPicker}
-                    >
-                      {year.length > 0 ? (
-                        year.map((y) => (
-                          <Picker.Item 
-                            key={y} 
-                            label={y.toString()} 
-                            value={y} 
-                          />
-                        ))
-                      ) : (
-                        <Picker.Item
-                          label={new Date().getFullYear().toString()} 
-                          value={new Date().getFullYear()} 
-                        />
-                      )}
-                    </Picker>
-                  </View>
-                </View>
-              </View>
-
-              {chartLoading ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <ActivityIndicator size="small" color="#b91c1c" />
-                </View>
-              ) : (
-                <View style={{ marginTop: 10 }}>
-                  <View
-                    style={{
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 10 }}
-                    >
-
-<LineChart
-  data={{
-    labels: months,
-    datasets: [
-      {
-        data: profits,
-        strokeWidth: 4,
-        color: () => "#b91c1c",
-      },
-    ],
-  }}
-  width={600} // compact spacing
-  height={350} // slightly smaller
-  fromZero
-  segments={4} // cleaner horizontal grid
-  chartConfig={{
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 2,
-    color: () => "#b91c1c",
-    propsForBackgroundLines: {
-      stroke: "#f0f0f0",
-      strokeWidth: 1,
-    },
-    propsForDots: {
-      r: "5",
-      strokeWidth: "2",
-      stroke: "#b91c1c",
-      fill: "#fdecea",
-    },
-    fillShadowGradientFrom: "#dc2626",
-    fillShadowGradientFromOpacity: 0.2,
-    fillShadowGradientToOpacity: 0,
-  }}
-  bezier
-  withInnerLines={true} // show subtle horizontal grid
-  withOuterLines={false} // hide borders
-  withVerticalLabels={false} // hides Y-axis numbers\
-  yLabelsOffset={-999}
-  withHorizontalLabels={true} // shows X-axis months
-  renderDotContent={({ x, y, index }) => (
-    <Text
-      key={index}
-      style={{
-        position: "absolute",
-        top: y - 30,
-        left: x - 20,
-        backgroundColor: "#ffffff",
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: "#b91c1c",
-        fontSize: 10,
-        fontWeight: "600",
-        color: "#b91c1c",
-        elevation: 2,
-      }}
-    >
-      {formatCurrency(profits[index])}
-    </Text>
-  )}
-/>
-
-
-
-                    </ScrollView>
-                  </View>
-                </View>
-              )}
-
+            <View style={[headerStyle.card, headerStyle.cardRed]}>
+              <View style={headerStyle.cardGradientOverlay} />
+              <Text style={headerStyle.salesValueBig}>
+                ₱{Number(dailySales).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              </Text>
+              <Text style={headerStyle.salesLabel}>Daily Sales</Text>
+              <View style={headerStyle.cardDecoration} />
             </View>
 
-          </View>
-        ) : (
-          <View>
-            <Text style={{ fontSize: 18, fontWeight: "bold" }}>Reports View</Text>
-            <Text>Show reports-related charts here...</Text>
-          </View>
-        )}
+            <View style={[headerStyle.card, headerStyle.cardOrange]}>
+              <View style={headerStyle.cardGradientOverlay} />
+              <Text style={headerStyle.salesValue}>
+                ₱{(Number(weeklySales) / 1000).toFixed(1)}k
+              </Text>
+              <Text style={headerStyle.salesLabel}>Last 7 Days</Text>
+              <View style={headerStyle.cardDecoration} />
+            </View>
 
-      </ScrollView>
-    </SafeAreaView>
-  );
+            <View style={[headerStyle.card, headerStyle.cardGreen]}>
+              <View style={headerStyle.cardGradientOverlay} />
+              <Text style={headerStyle.salesValue}>
+                ₱{(Number(monthSales) / 1000).toFixed(1)}k
+              </Text>
+              <Text style={headerStyle.salesLabel}>This Month's Sales</Text>
+              <View style={headerStyle.cardDecoration} />
+            </View>
+          </ScrollView>
+
+          {/* monthly profit dapit */}
+          {/* <View style={profitStyle.profitCardContainer}>
+            <Text style={profitStyle.profitCardHeader}>Monthly Net Profit</Text>
+            <View style={profitStyle.profitCardContent}>
+              <View style={profitStyle.profitDateContainer}>
+                <Text style={profitStyle.profitMonthYear}>{month}</Text>
+                <Text style={profitStyle.profitDayDate}>{day}</Text>
+              </View>
+
+              <View style={profitStyle.profitAmountContainer}>
+                {profitMonth === null || profitMonth === 0 ? (
+                  <Text style={profitStyle.profitEmptyText}>Empty database.</Text>
+                ) : (
+                  <Text style={profitStyle.profitAmount}>
+                    {formatCurrency(profitMonth)}
+                  </Text>
+                )}
+                <Text style={profitStyle.profitAmountLabel}>Current Net Profit</Text>
+              </View>
+
+              <View style={profitStyle.profitActionsContainer}>
+                <View style={profitStyle.profitYearPickerContainer}>
+                  <Picker
+                    selectedValue={selectedYear}
+                    onValueChange={handleYearChange}
+                    style={profitStyle.profitYearPicker}
+                  >
+                    {year.length > 0 ? (
+                      year.map((y) => (
+                        <Picker.Item 
+                          key={y} 
+                          label={y.toString()} 
+                          value={y} 
+                        />
+                      ))
+                    ) : (
+                      <Picker.Item
+                        label={new Date().getFullYear().toString()} 
+                        value={new Date().getFullYear()} 
+                      />
+                    )}
+                  </Picker>
+                </View>
+              </View>
+            </View>
+
+            {chartLoading ? (
+              <View style={profitStyle.profitChartLoadingContainer}>
+                <ActivityIndicator size="small" color="#b91c1c" />
+              </View>
+            ) : (
+              <View style={profitStyle.profitChartContainer}>
+                <View style={profitStyle.profitChartWrapper}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={profitStyle.profitChartScrollContent}
+                  >
+                    <LineChart
+                      data={{
+                        labels: months,
+                        datasets: [
+                          {
+                            data: profits,
+                          },
+                        ],
+                      }}
+                      width={Math.max(screenWidth, months.length * 70)} 
+                      height={450}
+                      chartConfig={{
+                        backgroundColor: "#ffffff",
+                        backgroundGradientFrom: "#ffffff",
+                        backgroundGradientTo: "#ffffff",
+                        decimalPlaces: 2,
+                        color: () => "#b91c1c",
+                        labelColor: () => "#374151",
+                        propsForDots: {
+                          r: "5",
+                          strokeWidth: "0.5",
+                          stroke: "#b91c1c",
+                        },
+                        propsForBackgroundLines: {
+                          stroke: "#c8921eff",
+                        },
+                        paddingBottom: 0,
+                      }}
+                      bezier
+                      style={profitStyle.profitChart}
+                      withVerticalLabels={true}  
+                      withHorizontalLabels={false} 
+                      fromZero={true}
+                      segments={5}
+                      renderDotContent={({ x, y, index }) => (
+                        <Text
+                          key={index}
+                          style={[
+                            profitStyle.profitChartDotText,
+                            {
+                              top: y - 35,
+                              left: x - 20,
+                            }
+                          ]}
+                        >
+                          {formatCurrency(profits[index])}
+                        </Text>
+                      )}
+                    />
+                  </ScrollView>
+                </View>
+              </View>
+            )}
+          </View> */}
+
+        </View>
+      ) : (
+        <View>
+          <Text style={headerStyle.reportsTitle}>Reports View</Text>
+          <Text style={headerStyle.reportsText}>Show reports-related charts here...</Text>
+        </View>
+      )}
+
+    </ScrollView>
+  </SafeAreaView>
+);
 }
 
 const headerStyle = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
@@ -681,114 +651,134 @@ const headerStyle = StyleSheet.create({
   },
 });
 
-const profitStyle = StyleSheet.create({
-  profitCardContainer: {
-    backgroundColor: "#ffffff",
-    padding: 18,
-    borderRadius: 12,
-    borderColor: "#ced0d3ff",
-    borderWidth: 1,
-    marginTop: 12,
-  },
 
-  profitCardHeader: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#1f2937",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 16,
-  },
+// const profitStyle = StyleSheet.create({
+//   /* ---------------- CONTAINER ---------------- */
+//   profitCardContainer: {
+//     backgroundColor: '#FFFFFF',
+//     borderRadius: 20,
+//     padding: 20,
+//     marginVertical: 12,
+//     shadowColor: '#000',
+//     shadowOffset: { width: 0, height: 6 },
+//     shadowOpacity: 0.1,
+//     shadowRadius: 12,
+//     elevation: 6,
+//   },
 
-  profitCardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
+//   /* ---------------- HEADER ---------------- */
+//   profitCardHeader: {
+//     fontSize: 20,
+//     fontWeight: '700',
+//     color: '#111827',
+//     marginBottom: 16,
+//   },
 
-  profitDateContainer: {},
+//   /* ---------------- CONTENT ---------------- */
+//   profitCardContent: {
+//     flexDirection: 'row',
+//     alignItems: 'center',
+//     justifyContent: 'space-between',
+//     marginBottom: 16,
+//   },
 
-  profitMonthYear: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: "#111827",
-  },
+//   profitDateContainer: {
+//     alignItems: 'center',
+//     marginRight: 16,
+//   },
 
-  profitDayDate: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
+//   profitMonthYear: {
+//     fontSize: 16,
+//     fontWeight: '600',
+//     color: '#6B7280',
+//   },
 
-  profitAmountContainer: {
-    alignItems: "center",
-  },
+//   profitDayDate: {
+//     fontSize: 28,
+//     fontWeight: '800',
+//     color: '#111827',
+//   },
 
-  profitAmount: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111827",
-  },
+//   profitAmountContainer: {
+//     flex: 1,
+//     alignItems: 'flex-start',
+//     justifyContent: 'center',
+//   },
 
-  profitEmptyText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#dc2626",
-  },
+//   profitEmptyText: {
+//     fontSize: 16,
+//     fontWeight: '500',
+//     color: '#9CA3AF',
+//   },
 
-  profitAmountLabel: {
-    fontSize: 12,
-    marginTop: 3,
-    color: "#6b7280",
-  },
+//   profitAmount: {
+//     fontSize: 28,
+//     fontWeight: '900',
+//     color: '#b91c1c',
+//     marginBottom: 4,
+//   },
 
-  profitActionsContainer: {
-    justifyContent: "flex-end",
-    flexDirection: "row",
-  },
+//   profitAmountLabel: {
+//     fontSize: 14,
+//     fontWeight: '600',
+//     color: '#6B7280',
+//   },
 
-  profitYearPickerContainer: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    width: 90,
-    height: 38,
-    justifyContent: "center",
-    backgroundColor: "#f9fafb",
-  },
+//   profitActionsContainer: {
+//     justifyContent: 'flex-end',
+//     alignItems: 'center',
+//   },
 
-  profitYearPicker: {
-    width: "100%",
-    height: "100%",
-  },
+//   profitYearPickerContainer: {
+//     width: 120,
+//     borderWidth: 1,
+//     borderColor: '#E5E7EB',
+//     borderRadius: 10,
+//     overflow: 'hidden',
+//     backgroundColor: '#F9FAFB',
+//   },
 
-  // Chart
-  profitChartContainer: {
-    marginTop: 10,
-  },
+//   profitYearPicker: {
+//     height: 40,
+//     color: '#111827',
+//   },
 
-  profitChartWrapper: {
-    borderRadius: 10,
-    paddingVertical: 10,
-    backgroundColor: "#ffffff",
-  },
+//   /* ---------------- CHART ---------------- */
+//   profitChartLoadingContainer: {
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     paddingVertical: 40,
+//   },
 
-  profitChart: {
-    marginLeft: -24,
-    marginBottom: -40,
-  },
+//   profitChartContainer: {
+//     marginTop: 12,
+//   },
 
-  profitChartDotText: {
-    position: "absolute",
-    fontSize: 10,
-    padding: 4,
-    color: "#1f2937",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 4,
-    fontWeight: "700",
-  },
-});
+//   profitChartWrapper: {
+//     borderRadius: 20,
+//     overflow: 'hidden',
+//   },
 
+//   profitChartScrollContent: {
+//     paddingRight: 20,
+//   },
 
+//   profitChart: {
+//     borderRadius: 20,
+//   },
 
+//   profitChartDotText: {
+//     position: 'absolute',
+//     fontSize: 12,
+//     fontWeight: '600',
+//     color: '#b91c1c',
+//     backgroundColor: 'rgba(255,255,255,0.9)',
+//     paddingHorizontal: 4,
+//     paddingVertical: 2,
+//     borderRadius: 4,
+//     overflow: 'hidden',
+//     textAlign: 'center',
+//   },
+// });
 
 
