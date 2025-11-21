@@ -108,9 +108,22 @@ export default function TabsLayout() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => console.log("Profile pressed")}>
-              <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
-            </TouchableOpacity>
+           <TouchableOpacity
+  onPress={() => {
+    if (!ownerEmail) {
+      Alert.alert("Error", "Unable to load profile. Please login again.");
+      return;
+    }
+
+    router.push({
+      pathname: "/(tabs)/profile",
+      params: { email: ownerEmail }
+    });
+  }}
+>
+  <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
+</TouchableOpacity>
+
           </View>
         ),
         tabBarActiveTintColor: "#ffffff",
@@ -162,6 +175,16 @@ export default function TabsLayout() {
           tabBarButton: () => null,
         }} 
       />
+
+      <Tabs.Screen
+  name="profile"
+  options={{
+    title: "Profile",
+    tabBarButton: () => null,
+  }}
+/>
+
     </Tabs>
+    
   );
 }
