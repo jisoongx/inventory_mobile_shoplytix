@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OwnerController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 
@@ -104,3 +105,7 @@ Route::post('/notifications/mark-seen', function (Request $request) {
         'message' => 'All notifications marked as seen'
     ]);
 });
+
+
+
+Route::get('/owner', [OwnerController::class, 'getOwner']);

@@ -34,7 +34,11 @@ export default function ProfileScreen() {
         return;
       }
 
-      const response = await fetch(`http://10.193.54.243:8000/api/owner?email=${email}`);
+      const response = await fetch(
+        `http://192.168.1.8:8000/api/owner?email=${encodeURIComponent(email)}`
+      );
+
+
       const data = await response.json();
 
       if (response.ok && data.success) {
@@ -111,8 +115,7 @@ export default function ProfileScreen() {
           <Text style={styles.label}>Store Address</Text>
           <Text style={styles.value}>{owner.store_address}</Text>
 
-          <Text style={styles.label}>Joined On</Text>
-          <Text style={styles.value}>{owner.created_on}</Text>
+
         </View>
       </ScrollView>
     </View>
