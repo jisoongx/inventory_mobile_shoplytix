@@ -43,7 +43,7 @@ export default function TabsLayout() {
       if (!userEmail) return;
 
       const response = await fetch(
-        `http://10.193.54.243:8000/api/notifications?email=${userEmail}&filter=all`
+        `http://192.168.1.9:8000/api/notifications?email=${userEmail}&filter=all`
       );
 
       const data = await response.json();

@@ -109,3 +109,11 @@ Route::post('/notifications/mark-seen', function (Request $request) {
 
 
 Route::get('/owner', [OwnerController::class, 'getOwner']);
+Route::put('/owner/update', [OwnerController::class, 'updateOwner']);
+
+Route::post('/owner/change-password', [OwnerController::class, 'changePassword']);
+Route::post('/owner/verify-current-password', [OwnerController::class, 'verifyCurrentPassword']);
+// routes/api.php
+Route::post('/forgot-password', [OwnerController::class, 'forgotPassword']);
+
+Route::post('/reset-password', [OwnerController::class, 'resetPassword']);

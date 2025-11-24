@@ -44,7 +44,7 @@ export default function DashboardScreen() {
         return;
       }
 
-      const url = `http://10.193.54.243:8000/api/dashboard?owner_id=${ownerId}&year=${selectedYear}`;
+      const url = `http://192.168.1.9:8000/api/dashboard?owner_id=${ownerId}&year=${selectedYear}`;
       
       if (!silent) {
         console.log('Fetching URL:', url);
@@ -122,7 +122,7 @@ export default function DashboardScreen() {
       const ownerId = await AsyncStorage.getItem('owner_id');
       
       const response = await fetch(
-        `http://10.193.54.243:8000/api/dashboard?owner_id=${ownerId}&year=${year}`
+        `http://192.168.1.9:8000/api/dashboard?owner_id=${ownerId}&year=${year}`
       );
       
       const data = await response.json();

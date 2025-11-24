@@ -55,7 +55,7 @@ export default function NotificationScreen() {
       }
 
       const response = await fetch(
-        `http://10.193.54.243:8000/api/notifications?email=${email}&filter=${filter}`
+        `http://192.168.1.9:8000/api/notifications?email=${email}&filter=${filter}`
       );
 
       const data = await response.json();
@@ -89,7 +89,7 @@ export default function NotificationScreen() {
       }
 
       const response = await fetch(
-        `http://10.193.54.243:8000/api/notifications/${notification.notif_id}/read`,
+        `http://192.168.1.9:8000/api/notifications/${notification.notif_id}/read`,
         {
           method: 'POST',
           headers: {
