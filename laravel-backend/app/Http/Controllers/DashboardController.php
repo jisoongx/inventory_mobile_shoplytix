@@ -378,13 +378,6 @@ class DashboardController extends Controller
             ORDER BY remaining_stock ASC
         ", [$owner_id]);
 
-        $stockAlert = collect($stockAlert)->map(function ($item) {
-            $filename = basename($item->prod_image);
-            $item->image_url = url('/image/' . $filename);
-            return $item;
-        });
-
-
 
         $expiry = DB::select("
             SELECT 
@@ -410,12 +403,6 @@ class DashboardController extends Controller
                 and i.stock > 0
             ORDER BY days_until_expiry ASC;
         ", [$owner_id]);
-
-        $expiry = collect($expiry)->map(function ($item) {
-            $item->image_url = asset('storage/' . ltrim($item->prod_image, '/'));
-            return $item;
-        });
-
 
 
         
@@ -445,12 +432,46 @@ class DashboardController extends Controller
             Limit 10
         ", [$owner_id, $month, $year]);
 
-        $topProd = collect($topProd)->map(function ($item) {
-            $item->image_url = asset('storage/' . ltrim($item->prod_image, '/'));
-            return $item;
-        });
 
 
+        
+        $baseUrl = env('APP_API_URL');
+
+        $stockAlert = array_map(function ($p) use ($baseUrl) {
+
+            if ($p->prod_image && $p->prod_image !== 'assets/no-product-image.png') {
+                $imageName = basename($p->prod_image); 
+                $p->prod_image = $baseUrl . '/api/dashboard-image/' . $imageName;
+            } else {
+                $p->prod_image = null;
+            }
+
+            return $p;
+        }, $stockAlert);
+
+        $expiry = array_map(function ($p) use ($baseUrl) {
+
+            if ($p->prod_image && $p->prod_image !== 'assets/no-product-image.png') {
+                $imageName = basename($p->prod_image); 
+                $p->prod_image = $baseUrl . '/api/dashboard-image/' . $imageName;
+            } else {
+                $p->prod_image = null;
+            }
+
+            return $p;
+        }, $expiry);
+
+        $topProd = array_map(function ($p) use ($baseUrl) {
+
+            if ($p->prod_image && $p->prod_image !== 'assets/no-product-image.png') {
+                $imageName = basename($p->prod_image); 
+                $p->prod_image = $baseUrl . '/api/dashboard-image/' . $imageName;
+            } else {
+                $p->prod_image = null;
+            }
+
+            return $p;
+        }, $topProd);
 
 
         return response()->json([
@@ -479,5 +500,16 @@ class DashboardController extends Controller
             'expiry' => $expiry,
             'topProd' => $topProd,
         ]);
+    }
+
+    public function getProductImage($filename)
+    {
+        $fullPath = 'D:/julie/laravel/inven/inventory/public/storage/product_images/' . $filename;
+
+        if (!file_exists($fullPath)) {
+            return response()->json(['error' => 'Image not found'], 404);
+        }
+
+        return response()->file($fullPath);
     }
 }

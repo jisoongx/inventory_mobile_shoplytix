@@ -523,6 +523,11 @@ export default function DashboardScreen() {
                       >
                         {/* Product Image */}
                         <View style={stockStyles.imageContainer}>
+                          <Image
+                            source={{ uri: product.prod_image || 'https://via.placeholder.com/100' }}
+                            style={stockStyles.imageContainer}
+                            resizeMode="cover"
+                          />
                         </View>
 
                         {/* Product Info */}
@@ -530,11 +535,8 @@ export default function DashboardScreen() {
                           <Text style={stockStyles.productName} numberOfLines={1}>
                             {product.prod_name}
                           </Text>
-                          <Text style={stockStyles.productDetail}>
-                            Total: {product.total_stock}
-                          </Text>
                           <Text style={[stockStyles.stockRemaining, { color: colors.text }]}>
-                            {product.remaining_stock} items remaining
+                            {product.remaining_stock} items left
                           </Text>
                         </View>
 
@@ -597,6 +599,11 @@ export default function DashboardScreen() {
                       >
                         {/* Product Image */}
                         <View style={expirationStyles.imageContainer}>
+                          <Image
+                            source={{ uri: product.prod_image || 'https://via.placeholder.com/100' }}
+                            style={stockStyles.imageContainer}
+                            resizeMode="cover"
+                          />
                         </View>
 
                         {/* Product Info */}
@@ -677,6 +684,13 @@ export default function DashboardScreen() {
                             <Text style={topSellingStyle.bestSellerBadgeText}>#1 BEST SELLER</Text>
                           </View>
 
+                          <View style={stockStyles.imageContainer}>
+                            <Image
+                              source={{ uri: p.prod_image || 'https://via.placeholder.com/100' }}
+                              style={stockStyles.imageContainer}
+                              resizeMode="cover"
+                            />
+                          </View>
                           <View style={topSellingStyle.productInfo}>
                             <Text style={topSellingStyle.bestSellerName}>{p.prod_name}</Text>
                             <View style={topSellingStyle.statsRow}>
@@ -695,6 +709,13 @@ export default function DashboardScreen() {
                       // Regular Product Cards
                       return (
                         <View key={index} style={topSellingStyle.regularCard}>
+                          <View style={stockStyles.imageContainer}>
+                            <Image
+                              source={{ uri: p.prod_image || 'https://via.placeholder.com/100' }}
+                              style={stockStyles.imageContainer}
+                              resizeMode="cover"
+                            />
+                          </View>
                           <View style={topSellingStyle.rankBadge}>
                             <Text style={topSellingStyle.rankText}>#{index + 1}</Text>
                           </View>

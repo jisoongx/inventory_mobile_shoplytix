@@ -7,11 +7,19 @@ use App\Http\Controllers\OwnerController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use App\Http\Controllers\StoreController;
+use App\Http\Controllers\InventoryController;
 
 Route::post('/login', [LoginController::class, 'login']);
 Route::get('/dashboard', [DashboardController::class, 'index']);
+Route::get('/dashboard-image/{filename}', [DashboardController::class, 'getProductImage']);
+
+
+Route::get('/inventory', [InventoryController::class, 'index']);
+Route::get('/product-image/{filename}', [InventoryController::class, 'getProductImage']);
+
 Route::get('/products', [StoreController::class, 'index']);
 Route::post('/store/checkout', [StoreController::class, 'checkout']);
+Route::get('/store-image/{filename}', [StoreController::class, 'getProductImage']);
 
 Route::get('/notifications', function (Request $request) {
     $email = $request->query('email');
@@ -120,3 +128,6 @@ Route::post('/owner/verify-current-password', [OwnerController::class, 'verifyCu
 Route::post('/forgot-password', [OwnerController::class, 'forgotPassword']);
 
 Route::post('/reset-password', [OwnerController::class, 'resetPassword']);
+
+
+

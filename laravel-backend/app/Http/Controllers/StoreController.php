@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 class StoreController extends Controller
 {
+
     public function index(Request $request)
     {
         $owner_id = $request->input('owner_id');
@@ -18,9 +19,7 @@ class StoreController extends Controller
             ], 400);
         }
 
-        $owner = DB::table('owners')
-            ->where('owner_id', $owner_id)
-            ->first();
+        $owner = DB::table('owners')->where('owner_id', $owner_id)->first();
 
         if (!$owner) {
             return response()->json([
@@ -29,18 +28,31 @@ class StoreController extends Controller
             ], 404);
         }
 
-        $products = collect(DB::select("
+        $products = DB::select("
             SELECT 
                 p.prod_code,
                 p.name AS prod_name,
+                p.prod_image,
                 p.selling_price,
                 COALESCE(SUM(i.stock), 0) AS stock
             FROM products p 
             LEFT JOIN inventory i ON p.prod_code = i.prod_code 
             WHERE p.owner_id = ?
             AND p.prod_status = 'active'
-            GROUP BY p.prod_code, p.name, p.selling_price
-        ", [$owner_id]));
+            GROUP BY p.prod_code, p.name, p.prod_image, p.selling_price
+        ", [$owner_id]);
+
+        $baseUrl = env('APP_API_URL');
+
+        $products = array_map(function ($p) use ($baseUrl) {
+            if ($p->prod_image && $p->prod_image !== 'assets/no-product-image.png') {
+                $imageName = basename($p->prod_image); 
+                $p->prod_image = $baseUrl . '/api/store-image/' . $imageName;
+            } else {
+                $p->prod_image = null;
+            }
+            return $p;
+        }, $products);
 
         return response()->json([
             'success' => true,
@@ -196,6 +208,17 @@ class StoreController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function getProductImage($filename)
+    {
+        $fullPath = 'D:/julie/laravel/inven/inventory/public/storage/product_images/' . $filename;
+
+        if (!file_exists($fullPath)) {
+            return response()->json(['error' => 'Image not found'], 404);
+        }
+
+        return response()->file($fullPath);
     }
 
 

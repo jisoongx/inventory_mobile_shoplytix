@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
     View, Text, TouchableOpacity, ScrollView, StyleSheet, SafeAreaView, 
-    StatusBar, Alert, ActivityIndicator, Modal, TextInput,
+    StatusBar, Alert, ActivityIndicator, Modal, TextInput, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from "../constants";
@@ -54,7 +54,7 @@ export default function StoreScreen() {
         }
     };
 
-    const handleProductClick = (prod_code) => {
+    const handleProductClick = (prod_code:any) => {
         prod_code = String(prod_code);  // ← FIX #2 (ENSURE STRING)
 
         const product = products.find(p => p.prod_code === prod_code);
@@ -73,7 +73,7 @@ export default function StoreScreen() {
     };
 
     const getTotalItems = () => {
-        return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
+        return Object.values(cart).reduce((sum:any, qty:any) => sum + qty, 0);
     };
 
     const getTotalAmount = () => {
@@ -229,7 +229,11 @@ const confirmOrder = async () => {
                                 )}
 
                                 <View style={styles.productImagePlaceholder}>
-                                    <Text style={styles.productEmoji}>🛍️</Text>
+                                    <Image
+                                        source={{ uri: product.prod_image || 'https://via.placeholder.com/100' }}
+                                        style={styles.productImagePlaceholder}
+                                        resizeMode="cover"
+                                    />
                                 </View>
 
                                 <View style={styles.productInfo}>

@@ -109,21 +109,21 @@ export default function TabsLayout() {
               )}
             </TouchableOpacity>
 
-           <TouchableOpacity
-  onPress={() => {
-    if (!ownerEmail) {
-      Alert.alert("Error", "Unable to load profile. Please login again.");
-      return;
-    }
+          <TouchableOpacity
+            onPress={() => {
+              if (!ownerEmail) {
+                Alert.alert("Error", "Unable to load profile. Please login again.");
+                return;
+              }
 
-    router.push({
-      pathname: "/(tabs)/profile",
-      params: { email: ownerEmail }
-    });
-  }}
->
-  <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
-</TouchableOpacity>
+              router.push({
+                pathname: "/(tabs)/profile",
+                params: { email: ownerEmail }
+              });
+            }}
+          >
+            <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
+          </TouchableOpacity>
 
           </View>
         ),
@@ -150,6 +150,7 @@ export default function TabsLayout() {
           let iconName: keyof typeof Ionicons.glyphMap = "home";
           if (route.name === "dashboard") iconName = focused ? "home" : "home-outline";
           else if (route.name === "store") iconName = focused ? "storefront" : "storefront-outline";
+          else if (route.name === "inventory") iconName = focused ? "file-tray" : "file-tray-outline";
           return <Ionicons name={iconName} size={26} color={color} />;
         },
       })}
@@ -169,19 +170,25 @@ export default function TabsLayout() {
         }} 
       />
       <Tabs.Screen 
+        name="inventory" 
+        options={{ 
+          title: "Inventory",
+          tabBarLabel: "Inventory"
+        }} 
+      />
+      <Tabs.Screen 
         name="notification" 
         options={{ 
           title: "Notification",
           tabBarLabel: "Notification",
-          tabBarButton: () => null,
+          href: null,
         }} 
       />
-
       <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
-          tabBarButton: () => null,
+          href: null,
         }}
       />
 
