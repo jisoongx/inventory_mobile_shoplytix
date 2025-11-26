@@ -378,12 +378,80 @@ class DashboardController extends Controller
             ORDER BY remaining_stock ASC
         ", [$owner_id]);
 
-
-
         $stockAlert = collect($stockAlert)->map(function ($item) {
+            $filename = basename($item->prod_image);
+            $item->image_url = url('/image/' . $filename);
+            return $item;
+        });
+
+
+
+        $expiry = DB::select("
+            SELECT 
+                p.name AS prod_name, i.stock as expired_stock, p.prod_image,
+                i.expiration_date, i.batch_number,
+                CASE 
+                    WHEN i.expiration_date IS NULL THEN NULL
+                    ELSE DATEDIFF(i.expiration_date, CURDATE())
+                END AS days_until_expiry,
+                CASE
+                    WHEN i.expiration_date IS NULL THEN 'No Expiry'
+                    WHEN DATEDIFF(i.expiration_date, CURDATE()) <= 0 THEN 'Expired'
+                    WHEN DATEDIFF(i.expiration_date, CURDATE()) <= 7 THEN 'Critical'
+                    WHEN DATEDIFF(i.expiration_date, CURDATE()) <= 30 THEN 'Warning'
+                    WHEN DATEDIFF(i.expiration_date, CURDATE()) <= 60 THEN 'Monitor'
+                    ELSE 'Safe'
+                END AS status
+            FROM inventory i
+            JOIN products p ON i.prod_code = p.prod_code
+            WHERE p.owner_id = ?
+                AND i.expiration_date IS NOT NULL 
+                AND DATEDIFF(i.expiration_date, CURDATE()) BETWEEN 0 AND 60
+                and i.stock > 0
+            ORDER BY days_until_expiry ASC;
+        ", [$owner_id]);
+
+        $expiry = collect($expiry)->map(function ($item) {
             $item->image_url = asset('storage/' . ltrim($item->prod_image, '/'));
             return $item;
         });
+
+
+
+        
+        $month = now()->month;
+        $year = now()->year;
+
+        $topProd = DB::select("
+            SELECT 
+                p.name AS prod_name, 
+                p.prod_code, 
+                p.prod_image, 
+                SUM(ri.item_quantity * p.selling_price) as total_sales,
+                SUM(ri.item_quantity) AS unit_sold
+            FROM receipt r
+            JOIN receipt_item ri ON r.receipt_id = ri.receipt_id
+            JOIN products p ON ri.prod_code = p.prod_code 
+            WHERE 
+                r.owner_id = ?
+                AND MONTH(r.receipt_date) = ?
+                AND YEAR(r.receipt_date) = ?
+            GROUP BY 
+                p.prod_code, 
+                p.name, 
+                p.prod_image
+            ORDER BY 
+                total_sales DESC
+            Limit 10
+        ", [$owner_id, $month, $year]);
+
+        $topProd = collect($topProd)->map(function ($item) {
+            $item->image_url = asset('storage/' . ltrim($item->prod_image, '/'));
+            return $item;
+        });
+
+
+
 
         return response()->json([
             'success' => true,
@@ -407,8 +475,9 @@ class DashboardController extends Controller
             'productsPrev' => $productPrevData,
             'productsAve'=> $productsAveData,
             'categories' => $categories,
-
             'stockAlert' => $stockAlert,
+            'expiry' => $expiry,
+            'topProd' => $topProd,
         ]);
     }
 }

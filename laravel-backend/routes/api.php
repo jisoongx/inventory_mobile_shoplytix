@@ -6,9 +6,12 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OwnerController;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use App\Http\Controllers\StoreController;
 
 Route::post('/login', [LoginController::class, 'login']);
 Route::get('/dashboard', [DashboardController::class, 'index']);
+Route::get('/products', [StoreController::class, 'index']);
+Route::post('/store/checkout', [StoreController::class, 'checkout']);
 
 Route::get('/notifications', function (Request $request) {
     $email = $request->query('email');

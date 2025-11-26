@@ -6,5 +6,4 @@ import { Picker } from '@react-native-picker/picker';
 import { useRouter } from 'expo-router';
 
 export default function SalesScreen() {
-
 }

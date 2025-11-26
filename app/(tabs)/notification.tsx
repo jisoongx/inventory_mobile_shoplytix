@@ -4,19 +4,30 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Modal, RefreshControl, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { API } from "../constants";
 
 export default function NotificationScreen() {
+  type Notification = {
+    notif_id: number;
+    notif_type: string;
+    notif_title: string;
+    notif_message: string;
+    notif_created_on: Date;
+    usernotif_is_read: number;
+  };
+
+
   const params = useLocalSearchParams();
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all');
   const [unreadCount, setUnreadCount] = useState(0);
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedNotification, setSelectedNotification] = useState(null);
+  const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   
   
-  const pollingInterval = useRef(null);
+  const pollingInterval = useRef<any>(null);
 
   useEffect(() => {
     fetchNotifications();
@@ -42,7 +53,8 @@ export default function NotificationScreen() {
         setLoading(true);
       }
       
-      let email = params.email;
+      let email: string | null = (params.email as string) ?? null;
+
       if (!email) {
         email = await AsyncStorage.getItem('owner_email');
       }
@@ -55,7 +67,7 @@ export default function NotificationScreen() {
       }
 
       const response = await fetch(
-        `http://192.168.1.9:8000/api/notifications?email=${email}&filter=${filter}`
+        `${API}/notifications?email=${email}&filter=${filter}`
       );
 
       const data = await response.json();
@@ -83,13 +95,14 @@ export default function NotificationScreen() {
 
   const markAsRead = async (notification: any) => {
     try {
-      let email = params.email;
+      let email: string | null = (params.email as string) ?? null;
+
       if (!email) {
         email = await AsyncStorage.getItem('owner_email');
       }
 
       const response = await fetch(
-        `http://192.168.1.9:8000/api/notifications/${notification.notif_id}/read`,
+        `${API}/notifications/${notification.notif_id}/read`,
         {
           method: 'POST',
           headers: {

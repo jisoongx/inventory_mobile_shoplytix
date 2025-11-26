@@ -13,6 +13,7 @@ import {
   Modal
 } from "react-native";
 import { Ionicons } from '@expo/vector-icons';
+import { API } from "../constants";
 
 export default function ProfileScreen() {
   const params = useLocalSearchParams();
@@ -35,7 +36,7 @@ export default function ProfileScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  const pollingInterval = useRef<NodeJS.Timer | null>(null);
+  const pollingInterval = useRef<any>(null);
 
   const fetchOwnerDetails = async (silent = false) => {
     try {
@@ -52,7 +53,7 @@ export default function ProfileScreen() {
       }
 
       const response = await fetch(
-        `http://192.168.1.9:8000/api/owner?email=${encodeURIComponent(email)}`
+        `${API}/owner?email=${encodeURIComponent(email)}`
       );
 
       const data = await response.json();
@@ -77,7 +78,7 @@ export default function ProfileScreen() {
       setSaving(true);
 
       const response = await fetch(
-        `http://192.168.1.9:8000/api/owner/update`,
+        `${API}/owner/update`,
         {
           method: 'PUT',
           headers: {
@@ -165,7 +166,7 @@ export default function ProfileScreen() {
 
       // Step 1: Verify the current password by sending it to the server
       const verifyResponse = await fetch(
-        `http://192.168.1.9:8000/api/owner/verify-current-password`,
+        `${API}/owner/verify-current-password`,
         {
           method: 'POST',
           headers: {
@@ -189,7 +190,7 @@ export default function ProfileScreen() {
 
       // Step 3: Proceed with changing the password if the current password is correct
       const changePasswordResponse = await fetch(
-        `http://192.168.1.9:8000/api/owner/change-password`,
+        `${API}/owner/change-password`,
         {
           method: 'POST',
           headers: {

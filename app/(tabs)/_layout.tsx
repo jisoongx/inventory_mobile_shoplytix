@@ -4,12 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Alert, Text, TouchableOpacity, View } from "react-native";
+import { API } from "../constants";
 
 export default function TabsLayout() {
   const router = useRouter();
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
-  const pollingInterval = useRef(null);
+  const pollingInterval = useRef<any>(null);
 
   useEffect(() => {
     loadUserData();
@@ -43,7 +44,7 @@ export default function TabsLayout() {
       if (!userEmail) return;
 
       const response = await fetch(
-        `http://192.168.1.9:8000/api/notifications?email=${userEmail}&filter=all`
+        `${API}/notifications?email=${userEmail}&filter=all`
       );
 
       const data = await response.json();
@@ -148,7 +149,7 @@ export default function TabsLayout() {
         tabBarIcon: ({ color, size, focused }) => {
           let iconName: keyof typeof Ionicons.glyphMap = "home";
           if (route.name === "dashboard") iconName = focused ? "home" : "home-outline";
-          else if (route.name === "sales") iconName = focused ? "bar-chart" : "bar-chart-outline";
+          else if (route.name === "store") iconName = focused ? "storefront" : "storefront-outline";
           return <Ionicons name={iconName} size={26} color={color} />;
         },
       })}
@@ -161,10 +162,10 @@ export default function TabsLayout() {
         }} 
       />
       <Tabs.Screen 
-        name="sales" 
+        name="store" 
         options={{ 
-          title: "Sales",
-          tabBarLabel: "Sales"
+          title: "Store",
+          tabBarLabel: "Store"
         }} 
       />
       <Tabs.Screen 
@@ -177,12 +178,12 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-  name="profile"
-  options={{
-    title: "Profile",
-    tabBarButton: () => null,
-  }}
-/>
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarButton: () => null,
+        }}
+      />
 
     </Tabs>
     

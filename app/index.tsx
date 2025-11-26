@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View, Image} from "react-native";
+import { API } from "./constants";
 import { Ionicons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
@@ -12,26 +13,33 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     try {
-      const response = await fetch('http://192.168.1.9:8000/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch(`${API}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
+      const data = await res.json();
 
       if (data.success) {
-        await AsyncStorage.setItem('owner_id', data.owner_id.toString());
-        await AsyncStorage.setItem('owner_email', data.owner_email);
+        await AsyncStorage.multiSet([
+          ["owner_id", data.owner_id.toString()],
+          ["owner_email", data.owner_email],
+          ["owner_name", data.owner_name],
+        ]);
+
+        Alert.alert("Success", data.owner_email);
         router.replace("/(tabs)/dashboard");
       } else {
-        Alert.alert('Error', data.message);
+        Alert.alert("Error", data.message);
       }
+
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Unable to connect to the server.');
+      console.error("Login error:", error);
+      Alert.alert("Error", "Unable to connect to the server.");
     }
   };
+    
 
   return (
     <View style={styles.container}>

@@ -11,9 +11,11 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View, Image
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
+import { API } from "../constants";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
@@ -22,115 +24,57 @@ export default function DashboardScreen() {
   const [chartLoading, setChartLoading] = useState(false);
   const screenWidth = Dimensions.get("window").width;
   const [activeTab, setActiveTab] = useState<"overview" | "reports">("overview");
-  
-  // ✅ Polling interval refs
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const pollingIntervalRef = useRef<any>(null);
   const appStateRef = useRef(AppState.currentState);
 
-  const POLLING_INTERVAL = 30000; // 30 seconds (adjust as needed)
+  const POLLING_INTERVAL = 30000; 
 
   const fetchDashboard = async (silent = false) => {
     try {
-      if (!silent) {
-        setLoading(true);
-      }
-      
-      const ownerId = await AsyncStorage.getItem('owner_id');
-      
-      if (!silent) {
-        console.log('=== DASHBOARD FETCH DEBUG ===');
-        console.log('Owner ID:', ownerId);
-      }
-      
+      if (!silent) setLoading(true);
+
+      const ownerId = await AsyncStorage.getItem("owner_id");
       if (!ownerId) {
-        Alert.alert('Error', 'Please login first');
+        Alert.alert("Error", "Please login first");
         return;
       }
 
-      const url = `http://192.168.1.9:8000/api/dashboard?owner_id=${ownerId}&year=${selectedYear}`;
-      
-      if (!silent) {
-        console.log('Fetching URL:', url);
-      }
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!silent) {
-        console.log('Response Status:', response.status);
-        console.log('Response OK:', response.ok);
-      }
-      
-      const contentType = response.headers.get('content-type');
-      
-      if (!silent) {
-        console.log('Content-Type:', contentType);
-      }
-      
-      const text = await response.text();
-      
-      if (!silent) {
-        console.log('Raw Response (first 500 chars):', text.substring(0, 500));
-      }
-      
-      let data;
-      try {
-        data = JSON.parse(text);
-        if (!silent) {
-          console.log('Parsed Data:', data);
-        }
-      } catch (parseError) {
-        if (!silent) {
-          console.error('JSON Parse Error:', parseError);
-          console.log('Full Response Text:', text);
-          Alert.alert('Error', 'Server returned invalid JSON. Check console.');
-        }
-        return;
-      }
-      
-      if (response.ok && data.success) {
-        if (!silent) {
-          console.log('✅ Dashboard data loaded successfully');
-        }
+      const res = await fetch(`${API}/dashboard?owner_id=${ownerId}&year=${selectedYear}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        
         setDashboardData(data);
-      } else {
-        if (!silent) {
-          console.log('❌ Response not OK or success=false');
-          Alert.alert('Error', data.message || 'Failed to fetch dashboard data.');
-        }
+      } else if (!silent) {
+        Alert.alert("Error", data.message || "Failed to fetch dashboard data.");
       }
+
     } catch (error) {
       if (!silent) {
-        console.error('=== DASHBOARD FETCH ERROR ===');
-        console.error('Error Type:', error.constructor.name);
-        console.error('Error Message:', error.message);
-        console.error('Full Error:', error);
-        Alert.alert('Error', `Unable to connect: ${error.message}`);
+        console.error("Dashboard fetch error:", error);
+        if (error instanceof Error) {
+          Alert.alert("Error", `Unable to connect: ${error.message}`);
+        } else {
+          Alert.alert("Error", "An unexpected error occurred.");
+        }
       }
     } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+      if (!silent) setLoading(false); 
     }
   };
 
   const fetchChartData = async (year: number) => {
     try {
       setChartLoading(true);
-      const ownerId = await AsyncStorage.getItem('owner_id');
-      
-      const response = await fetch(
-        `http://192.168.1.9:8000/api/dashboard?owner_id=${ownerId}&year=${year}`
-      );
-      
-      const data = await response.json();
-      if (response.ok && data.success) {
-        setDashboardData(prev => ({
+
+      const ownerId = await AsyncStorage.getItem("owner_id");
+
+      const res = await fetch(`${API}/dashboard?owner_id=${ownerId}&year=${year}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setDashboardData((prev:any) => ({
           ...prev,
           profitMonth: data.profitMonth,
           profits: data.profits,
@@ -138,7 +82,7 @@ export default function DashboardScreen() {
         }));
       }
     } catch (error) {
-      console.error('Chart fetch error:', error);
+      console.error("Chart fetch error:", error);
     } finally {
       setChartLoading(false);
     }
@@ -154,13 +98,12 @@ export default function DashboardScreen() {
     // Set up new polling interval
     pollingIntervalRef.current = setInterval(() => {
       console.log('🔄 Polling dashboard data...');
-      fetchDashboard(true); // silent = true (no loading indicator)
+      fetchDashboard(true); 
     }, POLLING_INTERVAL);
 
     console.log(`✅ Polling started (every ${POLLING_INTERVAL / 1000} seconds)`);
   };
 
-  // ✅ Stop polling
   const stopPolling = () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
@@ -169,7 +112,7 @@ export default function DashboardScreen() {
     }
   };
 
-  // ✅ Handle app state changes (pause polling when app goes to background)
+ 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (
@@ -178,7 +121,7 @@ export default function DashboardScreen() {
       ) {
         console.log('📱 App came to foreground - resuming polling');
         startPolling();
-        fetchDashboard(true); // Fetch immediately when app becomes active
+        fetchDashboard(true);
       } else if (nextAppState.match(/inactive|background/)) {
         console.log('📱 App went to background - pausing polling');
         stopPolling();
@@ -192,18 +135,15 @@ export default function DashboardScreen() {
     };
   }, []);
 
-  // ✅ Initial fetch and start polling
   useEffect(() => {
-    fetchDashboard(); // Initial fetch with loading indicator
-    startPolling(); // Start polling
+    fetchDashboard(); 
+    startPolling(); 
 
-    // Cleanup on unmount
     return () => {
       stopPolling();
     };
   }, []);
 
-  // ✅ Update polling when year changes
   useEffect(() => {
     stopPolling();
     startPolling();
@@ -245,7 +185,7 @@ export default function DashboardScreen() {
     weeklySales = 0,
     monthSales = 0,
     profitMonth = 0,
-    profits = [],
+    profits = [], 
     months = [],
     year = [],
     categories = [],
@@ -255,6 +195,8 @@ export default function DashboardScreen() {
     losses = [],
     sales = [],
     stockAlert = [],
+    expiry = [],
+    topProd = [],
   } = dashboardData || {};
 
   const dateDisplay = new Date().toLocaleDateString("en-US", {
@@ -277,7 +219,7 @@ export default function DashboardScreen() {
   const hasCategoryData = categories.length > 0 && products.length > 0;
   const hasSalesLossData = sales.length > 0 && losses.length > 0 && (sales[sales.length - 1] !== 0 || losses[losses.length - 1] !== 0);
     
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string) => {
     switch(status) {
       case 'Critical':
         return {
@@ -302,6 +244,41 @@ export default function DashboardScreen() {
           border: '#E5E7EB',
           text: '#6B7280',
           dot: '#9CA3AF'
+        };
+    }
+  };
+
+  const getExpiryStatusColor = (status: string) => {
+    switch (status) {
+      case 'Expired':
+        return {
+          border: '#7f1d1d',
+          text: '#7f1d1d',
+          dot: '#7f1d1d',
+        };
+      case 'Critical':
+        return {
+          border: '#ef4444',
+          text: '#dc2626',
+          dot: '#ef4444',
+        };
+      case 'Warning':
+        return {
+          border: '#f97316',
+          text: '#ea580c',
+          dot: '#f97316',
+        };
+      case 'Monitor':
+        return {
+          border: '#eab308',
+          text: '#ca8a04',
+          dot: '#eab308',
+        };
+      default:
+        return {
+          border: '#d1d5db',
+          text: '#6b7280',
+          dot: '#9ca3af',
         };
     }
   };
@@ -396,7 +373,7 @@ export default function DashboardScreen() {
                       style={profitStyle.profitYearPicker}
                     >
                       {year.length > 0 ? (
-                        year.map((y) => (
+                        year.map((y:any) => (
                           <Picker.Item 
                             key={y} 
                             label={y.toString()} 
@@ -419,89 +396,326 @@ export default function DashboardScreen() {
                   <ActivityIndicator size="small" color="#b91c1c" />
                 </View>
               ) : (
-                <View style={{ marginTop: 10 }}>
-                  <View
-                    style={{
-                      backgroundColor: "#ffffff",
-                    }}
-                  >
+                <View style={{ marginTop: 20 }}>
+                  {/* Chart Card */}
+                  <View style={{
+                    backgroundColor: '#ffffff',
+                    borderRadius: 16,
+                    paddingHorizontal: 16,
+                  }}>
+
+                    {/* Chart with Horizontal Scroll */}
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingHorizontal: 10 }}
+                      contentContainerStyle={{ paddingRight: 20 }}
                     >
-
-<LineChart
-  data={{
-    labels: months,
-    datasets: [
-      {
-        data: profits,
-        strokeWidth: 4,
-        color: () => "#b91c1c",
-      },
-    ],
-  }}
-  width={600} // compact spacing
-  height={350} // slightly smaller
-  fromZero
-  segments={4} // cleaner horizontal grid
-  chartConfig={{
-    backgroundGradientFrom: "#ffffff",
-    backgroundGradientTo: "#ffffff",
-    decimalPlaces: 2,
-    color: () => "#b91c1c",
-    propsForBackgroundLines: {
-      stroke: "#f0f0f0",
-      strokeWidth: 1,
-    },
-    propsForDots: {
-      r: "5",
-      strokeWidth: "2",
-      stroke: "#b91c1c",
-      fill: "#fdecea",
-    },
-    fillShadowGradientFrom: "#dc2626",
-    fillShadowGradientFromOpacity: 0.2,
-    fillShadowGradientToOpacity: 0,
-  }}
-  bezier
-  withInnerLines={true} // show subtle horizontal grid
-  withOuterLines={false} // hide borders
-  withVerticalLabels={false} // hides Y-axis numbers\
-  yLabelsOffset={-999}
-  withHorizontalLabels={true} // shows X-axis months
-  renderDotContent={({ x, y, index }) => (
-    <Text
-      key={index}
-      style={{
-        position: "absolute",
-        top: y - 30,
-        left: x - 20,
-        backgroundColor: "#ffffff",
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: "#b91c1c",
-        fontSize: 10,
-        fontWeight: "600",
-        color: "#b91c1c",
-        elevation: 2,
-      }}
-    >
-      {formatCurrency(profits[index])}
-    </Text>
-  )}
-/>
-
-
-
+                    <LineChart
+                      {...{
+                        data: {
+                          labels: months.length > 0 ? months : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                          datasets: [{ 
+                            data: profits.length > 0 ? profits : [0] 
+                          }],
+                        },
+                        width: 500,
+                        height: 320,
+                        fromZero: true,
+                        segments: 4,
+                        chartConfig: {
+                          backgroundGradientFrom: '#ffffff',
+                          backgroundGradientTo: '#ffffff',
+                          decimalPlaces: 0,
+                          color: () => '#b91c1c',
+                          propsForBackgroundLines: {
+                            stroke: '#f3f4f6', 
+                            strokeWidth: 1,
+                            strokeDasharray: '0',
+                          },
+                          propsForDots: { 
+                            r: '6', 
+                            strokeWidth: '2.5', 
+                            stroke: '#b91c1c', 
+                            fill: '#fdecea' 
+                          },
+                          fillShadowGradientFrom: '#dc2626',
+                          fillShadowGradientFromOpacity: 0.2,
+                          fillShadowGradientTo: '#dc2626',
+                          fillShadowGradientToOpacity: 0,
+                          propsForLabels: {
+                            fontSize: 13,
+                            fontWeight: '500',
+                            fill: '#6b7280',
+                          },
+                        },
+                        bezier: true,
+                        withInnerLines: true,
+                        withOuterLines: false,
+                        withVerticalLabels: true,
+                        withHorizontalLabels: false,
+                        withDots: true,
+                        withShadow: false,
+                        style: {
+                          paddingRight: 20,
+                        },
+                      } as any}
+                      renderDotContent={({ x, y, index }: any) => {
+                        const profitValue = profits[index];
+                        if (!profitValue || profitValue === 0) return null;
+                        
+                        return (
+                          <View
+                            key={`dot-${index}`}
+                            style={{
+                              position: 'absolute',
+                              top: y - 30,
+                              left: x - 35,
+                              backgroundColor: 'transparent',
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{
+                              fontSize: 13,
+                              fontWeight: '600',
+                              color: '#b91c1c',
+                            }}>
+                              {formatCurrency(profitValue)}
+                            </Text>
+                          </View>
+                        );
+                      }}
+                    />
                     </ScrollView>
                   </View>
                 </View>
               )}
+            </View>
 
+            {/* Stock Alert Card */}
+            <View style={stockStyles.container}>
+              {/* Floating Header Badge */}
+              <View style={stockStyles.headerWrapper}>
+                <View style={stockStyles.headerBadge}>
+                  <Text style={stockStyles.headerBadgeText}>Stock Alert</Text>
+                </View>
+              </View>
+
+              {/* Content Area */}
+              <ScrollView 
+                style={stockStyles.scrollView}
+                contentContainerStyle={stockStyles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
+                {stockAlert.length > 0 ? (
+                  stockAlert.map((product: any, index: any) => {
+                    const colors = getStatusColor(product.status);
+                    
+                    return (
+                      <View 
+                        key={index} 
+                        style={[
+                          stockStyles.productCard,
+                          { borderColor: colors.border }
+                        ]}
+                      >
+                        {/* Product Image */}
+                        <View style={stockStyles.imageContainer}>
+                        </View>
+
+                        {/* Product Info */}
+                        <View style={stockStyles.productInfo}>
+                          <Text style={stockStyles.productName} numberOfLines={1}>
+                            {product.prod_name}
+                          </Text>
+                          <Text style={stockStyles.productDetail}>
+                            Total: {product.total_stock}
+                          </Text>
+                          <Text style={[stockStyles.stockRemaining, { color: colors.text }]}>
+                            {product.remaining_stock} items remaining
+                          </Text>
+                        </View>
+
+                        {/* Status Badge */}
+                        <View style={stockStyles.statusSection}>
+                          <View style={[stockStyles.statusDot, { backgroundColor: colors.dot }]} />
+                          <Text style={[stockStyles.statusText, { color: colors.text }]}>
+                            {product.status}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={stockStyles.emptyState}>
+                    <Ionicons style={stockStyles.emptyIcon} name="cart"></Ionicons>
+                    <Text style={stockStyles.emptyText}>
+                      Everything is well stocked! No items need restocking right now.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Footer */}
+              <View style={stockStyles.footer}>
+                <Ionicons style={stockStyles.footerIcon} name="cart"></Ionicons>
+                <Text style={stockStyles.footerText}>
+                  {stockAlert.length} {stockAlert.length === 1 ? 'item requires' : 'items require'} restocking
+                </Text>
+              </View>
+            </View>
+
+            {/* Expiration Card */}
+            <View style={expirationStyles.container}>
+              {/* Floating Header Badge */}
+              <View style={expirationStyles.headerWrapper}>
+                <View style={expirationStyles.headerBadge}>
+                  <Text style={expirationStyles.headerBadgeText}>Expiration Notice</Text>
+                </View>
+              </View>
+
+              {/* Content Area */}
+              <ScrollView 
+                style={expirationStyles.scrollView}
+                contentContainerStyle={expirationStyles.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
+                {expiry.length > 0 ? (
+                  expiry.map((product:any, index:any) => {
+                    const colors = getExpiryStatusColor(product.status);
+                    
+                    return (
+                      <View 
+                        key={index} 
+                        style={[
+                          expirationStyles.productCard,
+                          { borderColor: colors.border }
+                        ]}
+                      >
+                        {/* Product Image */}
+                        <View style={expirationStyles.imageContainer}>
+                        </View>
+
+                        {/* Product Info */}
+                        <View style={expirationStyles.productInfo}>
+                          <Text style={expirationStyles.productName} numberOfLines={1}>
+                            {product.prod_name}
+                          </Text>
+                          <Text style={expirationStyles.productDetail}>
+                            <Text style={expirationStyles.batchNumber}>
+                              {product.batch_number}
+                            </Text>
+                            {' • '}
+                            {product.expired_stock} items
+                          </Text>
+                          <Text style={[expirationStyles.daysLeft, { color: colors.text }]}>
+                            {product.days_until_expiry} days left!
+                          </Text>
+                        </View>
+
+                        {/* Status Badge */}
+                        <View style={expirationStyles.statusSection}>
+                          <View style={[expirationStyles.statusDot, { backgroundColor: colors.dot }]} />
+                          <Text style={[expirationStyles.statusText, { color: colors.text }]}>
+                            {product.status}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                ) : (
+                  <View style={expirationStyles.emptyState}>
+                    <Ionicons style={stockStyles.emptyIcon} name="alert-circle"></Ionicons>
+                    <Text style={expirationStyles.emptyText}>
+                      There are currently no products set to expire within the next 60 days.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Footer */}
+              <View style={expirationStyles.footer}>
+                <Ionicons style={stockStyles.footerIcon} name="alert-circle"></Ionicons>
+                <Text style={expirationStyles.footerText}>
+                  {expiry.length} {expiry.length === 1 ? 'item is' : 'items are'} set to expire in less than 60 days
+                </Text>
+              </View>
+            </View>
+            
+            {/* Top selling Card */}
+            <View style={topSellingStyle.container}>
+              <View style={topSellingStyle.headerContainer}>
+                <View style={topSellingStyle.header}>
+                  <View>
+                    <Text style={topSellingStyle.headerTitle}>TOP SELLING PRODUCTS</Text>
+                    <Text style={topSellingStyle.headerSubtitle}>Best performers this month</Text>
+                  </View>
+                  <View style={topSellingStyle.countBadge}>
+                    <Text style={topSellingStyle.countNumber}>{topProd.length}</Text>
+                    <Text style={topSellingStyle.countLabel}>items</Text>
+                  </View>
+                </View>
+              </View>
+              {/* Scrollable Products List */}
+              <ScrollView style={topSellingStyle.scrollView} contentContainerStyle={topSellingStyle.scrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}>
+                {topProd.length === 0 ? (
+                  <View style={topSellingStyle.emptyContainer}>
+                    <Ionicons style={stockStyles.emptyIcon} name="flame"></Ionicons>
+                    <Text style={topSellingStyle.emptyText}>Nothing to show.</Text>
+                  </View>
+                ) : (
+                  topProd.map((p:any, index:any) => {
+                    if (index === 0) {
+                      return (
+                        <View key={index} style={topSellingStyle.bestSellerCard}>
+                          <View style={topSellingStyle.bestSellerBadge}>
+                            <Text style={topSellingStyle.bestSellerBadgeText}>#1 BEST SELLER</Text>
+                          </View>
+
+                          <View style={topSellingStyle.productInfo}>
+                            <Text style={topSellingStyle.bestSellerName}>{p.prod_name}</Text>
+                            <View style={topSellingStyle.statsRow}>
+                              <Text style={topSellingStyle.bestSellerSold}>{p.unit_sold} sold</Text>
+                              <Text style={topSellingStyle.bestSellerSales}>
+                                ₱{parseFloat(p.total_sales).toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    } else {
+                      // Regular Product Cards
+                      return (
+                        <View key={index} style={topSellingStyle.regularCard}>
+                          <View style={topSellingStyle.rankBadge}>
+                            <Text style={topSellingStyle.rankText}>#{index + 1}</Text>
+                          </View>
+                          <View style={topSellingStyle.productInfo}>
+                            <Text style={topSellingStyle.regularName}>{p.prod_name}</Text>
+                            <View style={topSellingStyle.statsRow}>
+                              <Text style={topSellingStyle.regularSold}>{p.unit_sold} sold</Text>
+                              <Text style={topSellingStyle.regularSales}>
+                                ₱{parseFloat(p.total_sales).toLocaleString('en-US', { 
+                                  minimumFractionDigits: 2, 
+                                  maximumFractionDigits: 2 
+                                })}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    }
+                  })
+                )}
+              </ScrollView>
             </View>
 
           </View>
@@ -730,7 +944,7 @@ const profitStyle = StyleSheet.create({
   },
 
   profitEmptyText: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
     color: "#dc2626",
   },
@@ -788,6 +1002,500 @@ const profitStyle = StyleSheet.create({
   },
 });
 
+const stockStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    paddingTop: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    shadowColor: '#af361eff',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: 40,
+  },
+  headerWrapper: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  headerBadge: {
+    backgroundColor: '#b91c1c',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    shadowColor: '#b91c1c',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  headerBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  scrollView: {
+    maxHeight: 464,
+    marginTop: 8,
+  },
+  scrollContent: {
+    paddingBottom: 8,
+  },
+  productCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    marginBottom: 12,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  imageContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
+  productInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  productDetail: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  stockRemaining: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  emptyState: {
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f9fafb',
+    borderRadius: 24,
+    marginTop: 20,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  footer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerIcon: {
+    fontSize: 25,
+    color: '#e20000ff',
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#dc2626',
+    flex: 1,
+  },
+});
+
+const expirationStyles = StyleSheet.create({
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    paddingTop: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 8,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginTop: 40,
+  },
+  headerWrapper: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  headerBadge: {
+    backgroundColor: '#1e40af',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 24,
+    shadowColor: '#1e40af',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  headerBadgeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  scrollView: {
+    maxHeight: 464,
+    marginTop: 8,
+  },
+  scrollContent: {
+    paddingBottom: 8,
+  },
+  productCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 12,
+    borderRadius: 20,
+    borderWidth: 2,
+    marginBottom: 12,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  imageContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#f3f4f6',
+  },
+  productImage: {
+    width: '100%',
+    height: '100%',
+  },
+  productInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  productDetail: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6b7280',
+  },
+  batchNumber: {
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  daysLeft: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  emptyState: {
+    paddingVertical: 80,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f9fafb',
+    borderRadius: 24,
+    marginTop: 20,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  footer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerIcon: {
+    fontSize: 25,
+    color: '#e20000ff',
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#dc2626',
+    flex: 1,
+  },
+});
+
+const topSellingStyle = StyleSheet.create({
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    flex: 1,
+    paddingTop: 50,
+    width: '100%',
+    marginTop: 40,
+    marginBottom: 40,
+    position: 'relative',
+  },
+  headerContainer: {
+    position: 'absolute',
+    top: -24,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  header: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#166534',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    color: '#ffffff',
+  },
+  headerSubtitle: {
+    color: '#bbf7d0',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  countBadge: {
+    backgroundColor: '#166534',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 999,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  countNumber: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  countLabel: {
+    color: '#bbf7d0',
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  scrollView: {
+    maxHeight: 464,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },  
+  scrollContent: {
+    paddingBottom: 16,
+  },
+  bestSellerCard: {
+    position: 'relative',
+    borderRadius: 12,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 2,
+    borderColor: '#facc15',
+    backgroundColor: '#fffbeb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+    marginBottom: 12,
+  },
+  bestSellerBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#facc15',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  bestSellerBadgeText: {
+    color: '#78350f',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  productImage: {
+    height: 64,
+    width: 64,
+    borderRadius: 8,
+  },
+  productInfo: {
+    flex: 1,
+  },
+  bestSellerName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 12,
+  },
+  bestSellerSold: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  bestSellerSales: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#15803d',
+  },
+  regularCard: {
+    borderRadius: 12,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#ffffff',
+    marginBottom: 12,
+  },
+  rankBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  rankText: {
+    color: '#334155',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  regularName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  regularSold: {
+    fontSize: 14,
+    color: '#4b5563',
+  },
+  regularSales: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 8,
+    color: '#6b7280',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#6b7280',
+  },
+});
 
 
 
