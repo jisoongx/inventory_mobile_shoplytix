@@ -436,6 +436,7 @@ class DashboardController extends Controller
 
         
         $baseUrl = env('APP_API_URL');
+        
 
         $stockAlert = array_map(function ($p) use ($baseUrl) {
 
@@ -504,7 +505,8 @@ class DashboardController extends Controller
 
     public function getProductImage($filename)
     {
-        $fullPath = 'D:/julie/laravel/inven/inventory/public/storage/product_images/' . $filename;
+        $storagePath = env('PRODUCT_IMAGE_PATH');
+        $fullPath = $storagePath . $filename;
 
         if (!file_exists($fullPath)) {
             return response()->json(['error' => 'Image not found'], 404);

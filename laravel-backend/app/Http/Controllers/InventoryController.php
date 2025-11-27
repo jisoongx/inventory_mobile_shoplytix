@@ -96,8 +96,9 @@ class InventoryController extends Controller
 
     public function getProductImage($filename)
     {
-        $fullPath = 'D:/julie/laravel/inven/inventory/public/storage/product_images/' . $filename;
-
+        $storagePath = env('PRODUCT_IMAGE_PATH');
+        $fullPath = $storagePath . $filename;
+        
         if (!file_exists($fullPath)) {
             return response()->json(['error' => 'Image not found'], 404);
         }
