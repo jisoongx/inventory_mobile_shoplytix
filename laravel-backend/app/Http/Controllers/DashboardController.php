@@ -474,6 +474,98 @@ class DashboardController extends Controller
             return $p;
         }, $topProd);
 
+        $whereClause = "WHERE p.owner_id = ? AND (di.set_to_return_to_supplier IS NULL OR di.set_to_return_to_supplier = ?)";
+        $bindings = [$owner_id, 'Damaged'];
+
+        $lossReport = DB::select("
+            SELECT 
+                di.damaged_id,
+                di.damaged_date AS date_reported, 
+                di.damaged_type AS type, 
+                di.damaged_quantity AS qty,
+                di.damaged_reason AS remarks,
+                p.name AS prod_name, 
+                c.category AS cat_name,
+                p.selling_price AS unit_cost,
+                (p.selling_price * di.damaged_quantity) AS total_loss,
+                CASE 
+                    WHEN s.staff_id IS NOT NULL 
+                    THEN s.firstname 
+                    ELSE o.firstname
+                END AS reported_by,
+                (SELECT i.batch_number FROM inventory i WHERE i.inven_code = di.inven_code) AS batch_num
+            FROM damaged_items di
+            join inventory i on i.inven_code = di.inven_code
+            JOIN products p ON p.prod_code = i.prod_code
+            JOIN categories c ON c.category_id = p.category_id
+            
+            LEFT JOIN owners o ON o.owner_id = di.owner_id
+            LEFT JOIN staff s ON s.staff_id = di.staff_id
+            {$whereClause}
+            ORDER BY di.damaged_date DESC
+        ", $bindings);
+
+        $lossReport = array_map(function($row) {
+            return [
+                'id'            => $row->damaged_id,
+                'product'       => $row->prod_name,
+                'quantity'      => $row->qty,
+                'estimatedLoss' => (float)$row->total_loss,
+                'reason'        => $row->remarks,
+            ];
+        }, $lossReport);
+
+
+
+        $productCategory = DB::select("
+            SELECT 
+                c.category,
+                SUM(x.category_sales) - SUM(x.discount_amount) AS total_amount, 
+                c.category_id
+            FROM categories c
+            LEFT JOIN (
+                SELECT 
+                    p.category_id,
+                    x.receipt_id,
+                    x.discount_amount,
+                    SUM(x.item_sales) AS category_sales
+                FROM (
+                    SELECT 
+                        r.receipt_id,
+                        r.discount_amount,
+                        ri.prod_code,
+                        ri.item_quantity,
+                        ri.item_discount_amount,
+                        r.receipt_date,
+                        ri.item_quantity * (
+                            COALESCE(
+                                (SELECT ph.old_selling_price
+                                FROM pricing_history ph
+                                WHERE ph.prod_code = ri.prod_code
+                                AND r.receipt_date BETWEEN ph.effective_from AND ph.effective_to
+                                ORDER BY ph.effective_from DESC
+                                LIMIT 1),
+                                p.selling_price
+                            ) 
+                        ) - COALESCE(ri.item_discount_amount, 0) AS item_sales
+                    FROM receipt r
+                    JOIN receipt_item ri ON ri.receipt_id = r.receipt_id
+                    JOIN products p ON p.prod_code = ri.prod_code
+                    WHERE 
+                        r.owner_id = ? 
+                        AND p.owner_id = r.owner_id
+                        AND YEAR(r.receipt_date) = ?
+                ) AS x
+                JOIN products p ON p.prod_code = x.prod_code
+                GROUP BY p.category_id, x.receipt_id
+            ) AS x ON c.category_id = x.category_id
+            WHERE c.owner_id = ?
+            GROUP BY c.category_id, c.category
+            ORDER BY c.category_id;
+        ", [
+            $owner_id, $latestYear,
+            $owner_id
+        ]);
 
         return response()->json([
             'success' => true,
@@ -500,6 +592,8 @@ class DashboardController extends Controller
             'stockAlert' => $stockAlert,
             'expiry' => $expiry,
             'topProd' => $topProd,
+            'lossReport' => $lossReport,
+            'productCategory' => $productCategory,
         ]);
     }
 

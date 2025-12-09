@@ -11,11 +11,12 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View, Image
+  View,
+  Image
 } from "react-native";
-import { LineChart } from "react-native-chart-kit";
+import { LineChart, PieChart } from 'react-native-chart-kit';
 import { API } from "../constants";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 
 export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
@@ -24,12 +25,16 @@ export default function DashboardScreen() {
   const [chartLoading, setChartLoading] = useState(false);
   const screenWidth = Dimensions.get("window").width;
   const [activeTab, setActiveTab] = useState<"overview" | "reports">("overview");
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const pollingIntervalRef = useRef<any>(null);
   const appStateRef = useRef(AppState.currentState);
+  const POLLING_INTERVAL = 30000;
 
-  const POLLING_INTERVAL = 30000; 
-
+  // const totalLoss = lossReport.reduce((sum, item) => sum + item.estimatedLoss, 0);
+  // ------------------------------
+  // FETCH DASHBOARD DATA
+  // ------------------------------
   const fetchDashboard = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -44,12 +49,10 @@ export default function DashboardScreen() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        
         setDashboardData(data);
       } else if (!silent) {
         Alert.alert("Error", data.message || "Failed to fetch dashboard data.");
       }
-
     } catch (error) {
       if (!silent) {
         console.error("Dashboard fetch error:", error);
@@ -60,25 +63,29 @@ export default function DashboardScreen() {
         }
       }
     } finally {
-      if (!silent) setLoading(false); 
+      if (!silent) setLoading(false);
     }
   };
 
+  // ------------------------------
+  // FETCH CHART DATA
+  // ------------------------------
   const fetchChartData = async (year: number) => {
     try {
       setChartLoading(true);
-
       const ownerId = await AsyncStorage.getItem("owner_id");
+      if (!ownerId) return;
 
       const res = await fetch(`${API}/dashboard?owner_id=${ownerId}&year=${year}`);
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setDashboardData((prev:any) => ({
+        setDashboardData((prev: any) => ({
           ...prev,
           profitMonth: data.profitMonth,
           profits: data.profits,
           months: data.months,
+          year: data.year || prev.year,
         }));
       }
     } catch (error) {
@@ -88,19 +95,23 @@ export default function DashboardScreen() {
     }
   };
 
-  // ✅ Start polling
-  const startPolling = () => {
-    // Clear any existing interval
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-    }
+  // ------------------------------
+  // HANDLE YEAR CHANGE
+  // ------------------------------
+  const handleYearChange = (year: number) => {
+    setSelectedYear(year);
+    fetchChartData(year);
+  };
 
-    // Set up new polling interval
+  // ------------------------------
+  // POLLING
+  // ------------------------------
+  const startPolling = () => {
+    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     pollingIntervalRef.current = setInterval(() => {
       console.log('🔄 Polling dashboard data...');
-      fetchDashboard(true); 
+      fetchDashboard(true);
     }, POLLING_INTERVAL);
-
     console.log(`✅ Polling started (every ${POLLING_INTERVAL / 1000} seconds)`);
   };
 
@@ -112,7 +123,9 @@ export default function DashboardScreen() {
     }
   };
 
- 
+  // ------------------------------
+  // APP STATE CHANGE
+  // ------------------------------
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (
@@ -126,34 +139,44 @@ export default function DashboardScreen() {
         console.log('📱 App went to background - pausing polling');
         stopPolling();
       }
-
       appStateRef.current = nextAppState;
     });
 
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, []);
 
+  // ------------------------------
+  // INITIAL FETCH & POLLING
+  // ------------------------------
   useEffect(() => {
-    fetchDashboard(); 
-    startPolling(); 
-
-    return () => {
-      stopPolling();
-    };
+    fetchDashboard();
+    startPolling();
+    return () => stopPolling();
   }, []);
 
+  // ------------------------------
+  // UPDATE POLLING ON YEAR CHANGE
+  // ------------------------------
   useEffect(() => {
+    fetchDashboard();
     stopPolling();
     startPolling();
   }, [selectedYear]);
 
-  const handleYearChange = (year: number) => {
-    setSelectedYear(year);
-    fetchChartData(year);
-  };
+  // ------------------------------
+  // AUTO SCROLL CHART
+  // ------------------------------
+  const months = dashboardData?.months || [];
+  useEffect(() => {
+    if (scrollViewRef.current && !chartLoading && months.length > 0) {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 300);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 500);
+    }
+  }, [chartLoading, months.length]);
 
+  // ------------------------------
+  // LOADING / ERROR STATES
+  // ------------------------------
   if (loading) {
     return (
       <View style={headerStyle.center}>
@@ -171,33 +194,28 @@ export default function DashboardScreen() {
     );
   }
 
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null || amount === 0) return '₱0.00';
-    return `₱${amount.toLocaleString('en-US', { 
-      minimumFractionDigits: 2, 
-      maximumFractionDigits: 2 
-    })}`;
-  };
-
+  // ------------------------------
+  // DATA DESTRUCTURE
+  // ------------------------------
   const {
     owner_name,
     dailySales = 0,
     weeklySales = 0,
     monthSales = 0,
     profitMonth = 0,
-    profits = [], 
-    months = [],
+    profits = [],
+    months: chartMonths = [],
     year = [],
     categories = [],
     products = [],
-    productsPrev = [],
-    productsAveData = [],
     losses = [],
     sales = [],
     stockAlert = [],
     expiry = [],
     topProd = [],
-  } = dashboardData || {};
+    lossReport = [],
+    productCategory = [],
+  } = dashboardData;
 
   const dateDisplay = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -205,81 +223,31 @@ export default function DashboardScreen() {
     year: "numeric",
   });
 
-  const day = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    day: 'numeric',
-    timeZone: 'Asia/Manila'
-  });
+  const day = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
+  const month = new Date().toLocaleDateString('en-US', { month: 'long', timeZone: 'Asia/Manila' });
+  const totalLoss = lossReport.reduce((sum:any, item:any) => sum + parseFloat(item.estimatedLoss  || 0), 0);
 
-  const month = new Date().toLocaleDateString('en-US', { 
-    month: 'long',
-    timeZone: 'Asia/Manila'
-  });
+  const formatCurrency = (amount: number | null) => {
+    if (!amount) return '₱0.00';
+    return `₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
 
-  const hasCategoryData = categories.length > 0 && products.length > 0;
-  const hasSalesLossData = sales.length > 0 && losses.length > 0 && (sales[sales.length - 1] !== 0 || losses[losses.length - 1] !== 0);
-    
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'Critical':
-        return {
-          border: '#EF4444',
-          text: '#DC2626',
-          dot: '#EF4444'
-        };
-      case 'Reorder':
-        return {
-          border: '#F97316',
-          text: '#EA580C',
-          dot: '#F97316'
-        };
-      case 'Normal':
-        return {
-          border: '#64748B',
-          text: '#475569',
-          dot: '#64748B'
-        };
-      default:
-        return {
-          border: '#E5E7EB',
-          text: '#6B7280',
-          dot: '#9CA3AF'
-        };
+      case 'Critical': return { border: '#EF4444', text: '#DC2626', dot: '#EF4444' };
+      case 'Reorder': return { border: '#F97316', text: '#EA580C', dot: '#F97316' };
+      case 'Normal': return { border: '#64748B', text: '#475569', dot: '#64748B' };
+      default: return { border: '#E5E7EB', text: '#6B7280', dot: '#9CA3AF' };
     }
   };
 
   const getExpiryStatusColor = (status: string) => {
     switch (status) {
-      case 'Expired':
-        return {
-          border: '#7f1d1d',
-          text: '#7f1d1d',
-          dot: '#7f1d1d',
-        };
-      case 'Critical':
-        return {
-          border: '#ef4444',
-          text: '#dc2626',
-          dot: '#ef4444',
-        };
-      case 'Warning':
-        return {
-          border: '#f97316',
-          text: '#ea580c',
-          dot: '#f97316',
-        };
-      case 'Monitor':
-        return {
-          border: '#eab308',
-          text: '#ca8a04',
-          dot: '#eab308',
-        };
-      default:
-        return {
-          border: '#d1d5db',
-          text: '#6b7280',
-          dot: '#9ca3af',
-        };
+      case 'Expired': return { border: '#7f1d1d', text: '#7f1d1d', dot: '#7f1d1d' };
+      case 'Critical': return { border: '#ef4444', text: '#dc2626', dot: '#ef4444' };
+      case 'Warning': return { border: '#f97316', text: '#ea580c', dot: '#f97316' };
+      case 'Monitor': return { border: '#eab308', text: '#ca8a04', dot: '#eab308' };
+      default: return { border: '#d1d5db', text: '#6b7280', dot: '#9ca3af' };
     }
   };
 
@@ -330,7 +298,7 @@ export default function DashboardScreen() {
               <View style={[headerStyle.card, headerStyle.cardOrange]}>
                 <View style={headerStyle.cardGradientOverlay} />
                 <Text style={headerStyle.salesValue}>
-                  ₱{(Number(weeklySales) / 1000).toFixed(1)}k
+                  ₱{Number(weeklySales).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </Text>
                 <Text style={headerStyle.salesLabel}>Last 7 Days</Text>
                 <View style={headerStyle.cardDecoration} />
@@ -346,34 +314,52 @@ export default function DashboardScreen() {
               </View>
             </ScrollView>
           
-            <View style={profitStyle.profitCardContainer}>
-              <Text style={profitStyle.profitCardHeader}>Monthly Net Profit</Text>
-              <View style={profitStyle.profitCardContent}>
-                <View style={profitStyle.profitDateContainer}>
-                  <Text style={profitStyle.profitMonthYear}>{month}</Text>
-                  <Text style={profitStyle.profitDayDate}>{day}</Text>
+            <View style={styles.profitCard}>
+              {/* Header Section */}
+              <View style={styles.headerSection}>
+                <View style={styles.headerTop}>
+                  <View style={styles.iconContainer}>
+                    <MaterialIcons name="trending-up" size={24} color="#b91c1c" />
+                  </View>
+                  <View style={styles.headerTitleContainer}>
+                    <Text style={styles.headerTitle}>Monthly Net Profit</Text>
+                    <Text style={styles.headerSubtitle}>Performance overview</Text>
+                  </View>
                 </View>
 
-                <View style={profitStyle.profitAmountContainer}>
-                  {profitMonth === null || profitMonth === 0 ? (
-                    <Text style={profitStyle.profitEmptyText}>0.00</Text>
-                  ) : (
-                    <Text style={profitStyle.profitAmount}>
-                      {formatCurrency(profitMonth)}
-                    </Text>
-                  )}
-                  <Text style={profitStyle.profitAmountLabel}>Current Net Profit</Text>
+                {/* Profit Display */}
+                <View style={styles.profitDisplay}>
+                  <View style={styles.dateSection}>
+                    <Text style={styles.monthText}>{month}</Text>
+                    <Text style={styles.dayText}>{day}</Text>
+                  </View>
+
+                  <View style={styles.amountSection}>
+                    {profitMonth === null || profitMonth === 0 ? (
+                      <Text style={styles.emptyAmount}>₱0.00</Text>
+                    ) : (
+                      <Text style={styles.profitAmount}>
+                        {formatCurrency(profitMonth)}
+                      </Text>
+                    )}
+                    <View style={styles.labelBadge}>
+                      <MaterialIcons name="account-balance-wallet" size={12} color="#059669" />
+                      <Text style={styles.labelText}>Current Net Profit</Text>
+                    </View>
+                  </View>
                 </View>
 
-                <View style={profitStyle.profitActionsContainer}>
-                  <View style={profitStyle.profitYearPickerContainer}>
+                {/* Year Picker */}
+                <View style={styles.yearPickerSection}>
+                  <MaterialIcons name="calendar-today" size={16} color="#6b7280" />
+                  <View style={styles.pickerWrapper}>
                     <Picker
                       selectedValue={selectedYear}
                       onValueChange={handleYearChange}
-                      style={profitStyle.profitYearPicker}
+                      style={styles.yearPicker}
                     >
                       {year.length > 0 ? (
-                        year.map((y:any) => (
+                        year.map((y: any) => (
                           <Picker.Item 
                             key={y} 
                             label={y.toString()} 
@@ -391,106 +377,148 @@ export default function DashboardScreen() {
                 </View>
               </View>
 
-              {chartLoading ? (
-                <View style={{ padding: 20, alignItems: "center" }}>
-                  <ActivityIndicator size="small" color="#b91c1c" />
-                </View>
-              ) : (
-                <View style={{ marginTop: 20 }}>
-                  {/* Chart Card */}
-                  <View style={{
-                    backgroundColor: '#ffffff',
-                    borderRadius: 16,
-                    paddingHorizontal: 16,
-                  }}>
+              {/* Divider */}
+              <View style={styles.divider} />
 
-                    {/* Chart with Horizontal Scroll */}
+              {/* Chart Section */}
+              <View style={styles.chartSection}>
+                <View style={styles.chartHeader}>
+                  <Text style={styles.chartTitle}>Yearly Trends</Text>
+                  <View style={styles.legendContainer}>
+                    <View style={styles.legendDot} />
+                    <Text style={styles.legendText}>Profit</Text>
+                  </View>
+                </View>
+
+                {chartLoading ? (
+                  <View style={styles.loaderContainer}>
+                    <ActivityIndicator size="large" color="#b91c1c" />
+                    <Text style={styles.loadingText}>Loading chart...</Text>
+                  </View>
+                ) : (
+                  <>
                     <ScrollView
+                      ref={scrollViewRef}
                       horizontal
                       showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ paddingRight: 20 }}
+                      contentContainerStyle={styles.scrollContent}
                     >
-                    <LineChart
-                      {...{
-                        data: {
+                      <LineChart
+                        data={{
                           labels: months.length > 0 ? months : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
                           datasets: [{ 
                             data: profits.length > 0 ? profits : [0] 
                           }],
-                        },
-                        width: 500,
-                        height: 320,
-                        fromZero: true,
-                        segments: 4,
-                        chartConfig: {
+                        }}
+                        width={Math.max(500, months.length * 60)}
+                        height={360}
+                        fromZero={true}
+                        segments={4}
+                        chartConfig={{
                           backgroundGradientFrom: '#ffffff',
                           backgroundGradientTo: '#ffffff',
                           decimalPlaces: 0,
-                          color: () => '#b91c1c',
+                          color: (opacity = 1) => `rgba(185, 28, 28, ${opacity})`,
                           propsForBackgroundLines: {
                             stroke: '#f3f4f6', 
-                            strokeWidth: 1,
+                            strokeWidth: '1.5',
                             strokeDasharray: '0',
                           },
                           propsForDots: { 
                             r: '6', 
-                            strokeWidth: '2.5', 
+                            strokeWidth: '3', 
                             stroke: '#b91c1c', 
-                            fill: '#fdecea' 
+                            fill: '#ffffff' 
                           },
                           fillShadowGradientFrom: '#dc2626',
-                          fillShadowGradientFromOpacity: 0.2,
-                          fillShadowGradientTo: '#dc2626',
-                          fillShadowGradientToOpacity: 0,
+                          fillShadowGradientFromOpacity: 0.25,
+                          fillShadowGradientTo: '#fef2f2',
+                          fillShadowGradientToOpacity: 0.05,
                           propsForLabels: {
-                            fontSize: 13,
-                            fontWeight: '500',
+                            fontSize: 11,
+                            fontWeight: '600',
                             fill: '#6b7280',
                           },
-                        },
-                        bezier: true,
-                        withInnerLines: true,
-                        withOuterLines: false,
-                        withVerticalLabels: true,
-                        withHorizontalLabels: false,
-                        withDots: true,
-                        withShadow: false,
-                        style: {
-                          paddingRight: 20,
-                        },
-                      } as any}
-                      renderDotContent={({ x, y, index }: any) => {
-                        const profitValue = profits[index];
-                        if (!profitValue || profitValue === 0) return null;
-                        
-                        return (
-                          <View
-                            key={`dot-${index}`}
-                            style={{
-                              position: 'absolute',
-                              top: y - 30,
-                              left: x - 35,
-                              backgroundColor: 'transparent',
-                              paddingHorizontal: 8,
-                              paddingVertical: 4,
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Text style={{
-                              fontSize: 13,
-                              fontWeight: '600',
-                              color: '#b91c1c',
-                            }}>
-                              {formatCurrency(profitValue)}
-                            </Text>
-                          </View>
-                        );
-                      }}
-                    />
+                        }}
+                        style={{
+                          paddingTop: 25,
+                          paddingBottom: -40,
+                          paddingLeft: -90,
+                          paddingHorizontal: 8,
+                        }}
+                        bezier
+                        withInnerLines={true}
+                        withOuterLines={false}
+                        withVerticalLabels={true}
+                        withHorizontalLabels={false}
+                        withDots={true}
+                        withShadow={false}
+                        renderDotContent={({ x, y, index }: any) => {
+                          const profitValue = profits[index];
+                          if (!profitValue || profitValue === 0) return null;
+                          
+                          return (
+                            <View
+                              key={`dot-${index}`}
+                              style={{
+                                position: 'absolute',
+                                top: y - 35,
+                                left: x - 35,
+                                backgroundColor: '#b91c1c',
+                                paddingHorizontal: 8,
+                                paddingVertical: 5,
+                                borderRadius: 6,
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 1 },
+                                shadowOpacity: 0.2,
+                                shadowRadius: 3,
+                                elevation: 2,
+                              }}
+                            >
+                              <Text style={{
+                                fontSize: 11,
+                                fontWeight: '700',
+                                color: '#ffffff',
+                              }}>
+                                {formatCurrency(profitValue)}
+                              </Text>
+                            </View>
+                          );
+                        }}
+                      />
                     </ScrollView>
-                  </View>
-                </View>
-              )}
+
+                    {/* Summary Stats */}
+                    {profits.length > 0 && (
+                      <View style={styles.statsContainer}>
+                        <View style={styles.statItem}>
+                          <MaterialIcons name="arrow-upward" size={16} color="#059669" />
+                          <Text style={styles.statLabel}>Highest</Text>
+                          <Text style={styles.statValue}>
+                            {formatCurrency(Math.max(...profits))}
+                          </Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                          <MaterialIcons name="arrow-downward" size={16} color="#dc2626" />
+                          <Text style={styles.statLabel}>Lowest</Text>
+                          <Text style={styles.statValue}>
+                            {formatCurrency(Math.min(...profits))}
+                          </Text>
+                        </View>
+                        <View style={styles.statDivider} />
+                        <View style={styles.statItem}>
+                          <MaterialIcons name="functions" size={16} color="#6366f1" />
+                          <Text style={styles.statLabel}>Average</Text>
+                          <Text style={styles.statValue}>
+                            {formatCurrency(profits.reduce((a:any, b:any) => a + b, 0) / profits.length)}
+                          </Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
             </View>
 
             {/* Stock Alert Card */}
@@ -741,9 +769,140 @@ export default function DashboardScreen() {
 
           </View>
         ) : (
-          <View>
-            <Text style={{ fontSize: 18, fontWeight: "bold" }}>Reports View</Text>
-            <Text>Show reports-related charts here...</Text>
+          <View style={reportStyle.container}>
+            <View style={reportStyle.header}>
+              <Text style={reportStyle.title}>Revenue Loss Report</Text>
+              <View style={reportStyle.totalContainer}>
+                <Text style={reportStyle.totalLabel}>Total Estimated Loss</Text>
+                <Text style={reportStyle.totalAmount}>
+                  ₱{totalLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={reportStyle.tableContainer}>
+                {/* Table Header */}
+                <View style={reportStyle.tableHeader}>
+                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnProduct]}>Product</Text>
+                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnQuantity]}>Qty</Text>
+                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnLoss]}>Est. Loss</Text>
+                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnReason]}>Reason</Text>
+                </View>
+
+                {/* Table Rows */}
+                {lossReport.map((item: any, index: any) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      reportStyle.tableRow,
+                      index % 2 === 0 ? reportStyle.tableRowEven : reportStyle.tableRowOdd,
+                    ]}
+                  >
+                    <Text style={[reportStyle.tableCellText, reportStyle.columnProduct]} numberOfLines={2}>
+                      {item.product}
+                    </Text>
+                    <Text style={[reportStyle.tableCellText, reportStyle.columnQuantity]}>
+                      {item.quantity}
+                    </Text>
+                    <Text style={[reportStyle.tableCellText, reportStyle.columnLoss, reportStyle.lossAmount]}>
+                      ₱{item.estimatedLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={[reportStyle.tableCellText, reportStyle.columnReason]} numberOfLines={2}>
+                      {item.reason}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              
+            </ScrollView>
+            <View>
+{chartLoading ? (
+  <View style={styles.loaderContainer}>
+    <ActivityIndicator size="large" color="#b91c1c" />
+    <Text style={styles.loadingText}>Loading chart...</Text>
+  </View>
+) : (
+  <>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+    >
+      <PieChart
+        data={
+          productCategory.length > 0
+            ? productCategory
+                .filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0)
+                .map((item: any, index: any) => ({
+                  name: item.category || 'Unknown',
+                  population: parseFloat(item.total_amount || 0),
+                  color: [
+                    '#dc2626', '#ea580c', '#ca8a04', '#16a34a', 
+                    '#0891b2', '#2563eb', '#7c3aed', '#c026d3',
+                    '#db2777', '#e11d48', '#f97316', '#84cc16'
+                  ][index % 12],
+                  legendFontColor: '#6b7280',
+                  legendFontSize: 12,
+                }))
+            : [{ name: 'No Data', population: 1, color: '#e5e7eb', legendFontColor: '#9ca3af', legendFontSize: 12 }]
+        }
+        width={Math.max(350, productCategory.filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0).length * 40)}
+        height={280}
+        chartConfig={{
+          color: (opacity = 1) => `rgba(185, 28, 28, ${opacity})`,
+          labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+        }}
+        accessor="population"
+        backgroundColor="transparent"
+        paddingLeft="15"
+        absolute
+        hasLegend={true}
+        style={{
+          paddingVertical: 20,
+        }}
+      />
+    </ScrollView>
+
+    {/* Summary Stats */}
+    {productCategory.length > 0 && productCategory.some((item: any) => item.total_amount && parseFloat(item.total_amount) > 0) && (
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <MaterialIcons name="arrow-upward" size={16} color="#059669" />
+          <Text style={styles.statLabel}>Highest</Text>
+          <Text style={styles.statValue}>
+            {formatCurrency(Math.max(...productCategory
+              .filter((item: any) => item.total_amount)
+              .map((item: any) => parseFloat(item.total_amount || 0))))}
+          </Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <MaterialIcons name="arrow-downward" size={16} color="#dc2626" />
+          <Text style={styles.statLabel}>Lowest</Text>
+          <Text style={styles.statValue}>
+            {formatCurrency(Math.min(...productCategory
+              .filter((item: any) => item.total_amount)
+              .map((item: any) => parseFloat(item.total_amount || 0))))}
+          </Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <MaterialIcons name="functions" size={16} color="#6366f1" />
+          <Text style={styles.statLabel}>Average</Text>
+          <Text style={styles.statValue}>
+            {(() => {
+              const validItems = productCategory.filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0);
+              const total = validItems.reduce((sum: number, item: any) => sum + parseFloat(item.total_amount || 0), 0);
+              return formatCurrency(total / validItems.length);
+            })()}
+          </Text>
+        </View>
+      </View>
+    )}
+  </>
+)}
+              </View>
           </View>
         )}
 
@@ -915,6 +1074,226 @@ const headerStyle = StyleSheet.create({
     lineHeight: 22,
   },
 });
+
+
+const styles = StyleSheet.create({
+  /* MAIN CARD */
+  profitCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 15,
+    marginTop: 15,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    overflow: 'hidden',
+  },
+  
+  /* HEADER SECTION */
+  headerSection: {
+    padding: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#fef2f2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  
+  /* PROFIT DISPLAY */
+  profitDisplay: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  dateSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  monthText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#b91c1c',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dayText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginTop: 2,
+  },
+  amountSection: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  profitAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#059669',
+    marginBottom: 6,
+  },
+  emptyAmount: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#d1d5db',
+    marginBottom: 6,
+  },
+  labelBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#f0fdf4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  labelText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#059669',
+  },
+  
+  /* YEAR PICKER */
+  yearPickerSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 16,
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  pickerWrapper: {
+    flex: 1,
+  },
+  yearPicker: {
+    height: 52,
+  },
+  
+  /* DIVIDER */
+  divider: {
+    height: 1,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: 20,
+  },
+  
+  /* CHART SECTION */
+  chartSection: {
+    padding: 20,
+  },
+  chartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fef2f2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#b91c1c',
+  },
+  legendText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#b91c1c',
+  },
+  
+  /* LOADING */
+  loaderContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    gap: 10,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  
+  /* CHART */
+  scrollContent: {
+    paddingRight: 20,
+  },
+  
+  /* STATS */
+  statsContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+    gap: 4,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+});
+
+
 
 const profitStyle = StyleSheet.create({
   profitCardContainer: {
@@ -1519,5 +1898,116 @@ const topSellingStyle = StyleSheet.create({
 });
 
 
-
-
+const reportStyle = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0f172a',
+    marginBottom: 12,
+  },
+  totalContainer: {
+    backgroundColor: '#fef2f2',
+    borderLeftWidth: 4,
+    borderLeftColor: '#dc2626',
+    borderRadius: 4,
+    padding: 14,
+  },
+  totalLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#991b1b',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  totalAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#dc2626',
+    letterSpacing: -0.5,
+  },
+  tableContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  tableHeaderText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    alignItems: 'center',
+    minHeight: 50,
+  },
+  tableRowEven: {
+    backgroundColor: '#ffffff',
+  },
+  tableRowOdd: {
+    backgroundColor: '#f8fafc',
+  },
+  tableCellText: {
+    fontSize: 12,
+    color: '#334155',
+    fontWeight: '500',
+    lineHeight: 16,
+  },
+  columnProduct: {
+    width: 100,
+    paddingRight: 6,
+  },
+  columnQuantity: {
+    width: 40,
+    textAlign: 'center',
+  },
+  columnLoss: {
+    width: 85,
+    textAlign: 'right',
+    paddingRight: 6,
+  },
+  columnReason: {
+    width: 110,
+    paddingLeft: 6,
+  },
+  lossAmount: {
+    fontWeight: '700',
+    color: '#dc2626',
+    fontSize: 12,
+  },
+});
