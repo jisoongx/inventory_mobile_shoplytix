@@ -131,3 +131,6 @@ Route::post('/reset-password', [OwnerController::class, 'resetPassword']);
 
 
 
+Route::get('/products', [StoreController::class, 'index']);
+Route::post('/store/checkout', [StoreController::class, 'checkout']);
+Route::get('/store-image/{filename}', [StoreController::class, 'getProductImage']);

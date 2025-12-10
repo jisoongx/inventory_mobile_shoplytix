@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 class StoreController extends Controller
 {
-
     public function index(Request $request)
     {
         $owner_id = $request->input('owner_id');
@@ -34,12 +33,14 @@ class StoreController extends Controller
                 p.name AS prod_name,
                 p.prod_image,
                 p.selling_price,
+                p.barcode,
                 COALESCE(SUM(i.stock), 0) AS stock
             FROM products p 
             LEFT JOIN inventory i ON p.prod_code = i.prod_code 
             WHERE p.owner_id = ?
             AND p.prod_status = 'active'
-            GROUP BY p.prod_code, p.name, p.prod_image, p.selling_price
+            GROUP BY p.prod_code, p.name, p.prod_image, p.selling_price, p.barcode
+            ORDER BY p.name ASC
         ", [$owner_id]);
 
         $baseUrl = env('APP_API_URL');
@@ -65,9 +66,9 @@ class StoreController extends Controller
     {
         $owner_id = $request->input('owner_id');
         $amount_paid = $request->input('amount_paid');
-        $items = $request->input('items'); 
+        $items = $request->input('items');
 
-        // Better validation
+        // Validation
         if (!$owner_id) {
             return response()->json([
                 'success' => false,
@@ -75,7 +76,7 @@ class StoreController extends Controller
             ], 400);
         }
 
-        if (!$amount_paid || $amount_paid <= 0) {
+        if (! $amount_paid || $amount_paid <= 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Valid amount_paid is required.'
@@ -107,7 +108,7 @@ class StoreController extends Controller
             // Validate all products exist before processing
             foreach ($items as $item) {
                 if (!isset($item['prod_code']) || !isset($item['quantity'])) {
-                    DB::rollBack();
+                    DB:: rollBack();
                     return response()->json([
                         'success' => false,
                         'message' => 'Each item must have prod_code and quantity.'
@@ -128,7 +129,7 @@ class StoreController extends Controller
                 }
             }
 
-            // 1. Create Receipt
+            // Create Receipt
             $receipt_id = DB::table('receipt')->insertGetId([
                 'receipt_date' => now(),
                 'owner_id' => $owner_id,
@@ -158,7 +159,7 @@ class StoreController extends Controller
                     DB::rollBack();
                     return response()->json([
                         'success' => false,
-                        'message' => "Not enough stock for product $prod_code. Needed: $qtyNeeded, Available: $totalAvailable"
+                        'message' => "Not enough stock for product $prod_code.  Needed: $qtyNeeded, Available: $totalAvailable"
                     ], 400);
                 }
 
@@ -171,17 +172,17 @@ class StoreController extends Controller
                     $subtract = min($available, $qtyNeeded);
 
                     // Deduct stock
-                    DB::table('inventory')
+                    DB:: table('inventory')
                         ->where('inven_code', $inv->inven_code)
                         ->update([
                             'stock' => $available - $subtract
                         ]);
 
-                    // Create receipt_item per inventory row used - ADD prod_code HERE
+                    // Create receipt_item
                     DB::table('receipt_item')->insert([
                         'receipt_id' => $receipt_id,
                         'inven_code' => $inv->inven_code,
-                        'prod_code' => $prod_code, // ← THIS IS THE FIX
+                        'prod_code' => $prod_code,
                         'item_quantity' => $subtract,
                         'vat_amount' => 0,
                         'item_discount_type' => null,
@@ -215,13 +216,10 @@ class StoreController extends Controller
         $storagePath = env('PRODUCT_IMAGE_PATH');
         $fullPath = $storagePath . $filename;
 
-        if (!file_exists($fullPath)) {
+        if (! file_exists($fullPath)) {
             return response()->json(['error' => 'Image not found'], 404);
         }
 
         return response()->file($fullPath);
     }
-
-
-
 }
