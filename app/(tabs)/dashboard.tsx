@@ -14,9 +14,11 @@ import {
   View,
   Image
 } from "react-native";
-import { LineChart, PieChart } from 'react-native-chart-kit';
+import { LineChart} from 'react-native-chart-kit';
 import { API } from "../constants";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import CategorySalesTable from './categorysaletable';
+import ProductSalesTable from './productsaletable';
 
 export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
@@ -158,7 +160,7 @@ export default function DashboardScreen() {
   // UPDATE POLLING ON YEAR CHANGE
   // ------------------------------
   useEffect(() => {
-    fetchDashboard();
+    fetchChartData(selectedYear);
     stopPolling();
     startPolling();
   }, [selectedYear]);
@@ -215,6 +217,7 @@ export default function DashboardScreen() {
     topProd = [],
     lossReport = [],
     productCategory = [],
+    categorySales = [],
   } = dashboardData;
 
   const dateDisplay = new Date().toLocaleDateString("en-US", {
@@ -227,16 +230,23 @@ export default function DashboardScreen() {
   const month = new Date().toLocaleDateString('en-US', { month: 'long', timeZone: 'Asia/Manila' });
   const totalLoss = lossReport.reduce((sum:any, item:any) => sum + parseFloat(item.estimatedLoss  || 0), 0);
 
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const years = [2025, 2024];
+
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '₱0.00';
     return `₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
+  const getStatusColor = (stock_status: string) => {
+    switch(stock_status) {
       case 'Critical': return { border: '#EF4444', text: '#DC2626', dot: '#EF4444' };
-      case 'Reorder': return { border: '#F97316', text: '#EA580C', dot: '#F97316' };
-      case 'Normal': return { border: '#64748B', text: '#475569', dot: '#64748B' };
+      case 'Warning': return { border: '#F97316', text: '#EA580C', dot: '#F97316' };
+      case 'Out of Stock': return { border: '#7f1d1d', text: '#7f1d1d', dot: '#7f1d1d' };
       default: return { border: '#E5E7EB', text: '#6B7280', dot: '#9CA3AF' };
     }
   };
@@ -358,8 +368,8 @@ export default function DashboardScreen() {
                       onValueChange={handleYearChange}
                       style={styles.yearPicker}
                     >
-                      {year.length > 0 ? (
-                        year.map((y: any) => (
+                      {years.length > 0 ? (
+                        years.map((y: any) => (
                           <Picker.Item 
                             key={y} 
                             label={y.toString()} 
@@ -506,14 +516,6 @@ export default function DashboardScreen() {
                             {formatCurrency(Math.min(...profits))}
                           </Text>
                         </View>
-                        <View style={styles.statDivider} />
-                        <View style={styles.statItem}>
-                          <MaterialIcons name="functions" size={16} color="#6366f1" />
-                          <Text style={styles.statLabel}>Average</Text>
-                          <Text style={styles.statValue}>
-                            {formatCurrency(profits.reduce((a:any, b:any) => a + b, 0) / profits.length)}
-                          </Text>
-                        </View>
                       </View>
                     )}
                   </>
@@ -539,7 +541,7 @@ export default function DashboardScreen() {
               >
                 {stockAlert.length > 0 ? (
                   stockAlert.map((product: any, index: any) => {
-                    const colors = getStatusColor(product.status);
+                    const colors = getStatusColor(product.stock_status);
                     
                     return (
                       <View 
@@ -564,7 +566,7 @@ export default function DashboardScreen() {
                             {product.prod_name}
                           </Text>
                           <Text style={[stockStyles.stockRemaining, { color: colors.text }]}>
-                            {product.remaining_stock} items left
+                            {product.total_stock} items left
                           </Text>
                         </View>
 
@@ -572,7 +574,7 @@ export default function DashboardScreen() {
                         <View style={stockStyles.statusSection}>
                           <View style={[stockStyles.statusDot, { backgroundColor: colors.dot }]} />
                           <Text style={[stockStyles.statusText, { color: colors.text }]}>
-                            {product.status}
+                            {product.stock_status}
                           </Text>
                         </View>
                       </View>
@@ -778,131 +780,109 @@ export default function DashboardScreen() {
                   ₱{totalLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={reportStyle.tableContainer}>
-                {/* Table Header */}
-                <View style={reportStyle.tableHeader}>
-                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnProduct]}>Product</Text>
-                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnQuantity]}>Qty</Text>
-                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnLoss]}>Est. Loss</Text>
-                  <Text style={[reportStyle.tableHeaderText, reportStyle.columnReason]}>Reason</Text>
-                </View>
-
-                {/* Table Rows */}
-                {lossReport.map((item: any, index: any) => (
-                  <View
-                    key={item.id}
-                    style={[
-                      reportStyle.tableRow,
-                      index % 2 === 0 ? reportStyle.tableRowEven : reportStyle.tableRowOdd,
-                    ]}
-                  >
-                    <Text style={[reportStyle.tableCellText, reportStyle.columnProduct]} numberOfLines={2}>
-                      {item.product}
-                    </Text>
-                    <Text style={[reportStyle.tableCellText, reportStyle.columnQuantity]}>
-                      {item.quantity}
-                    </Text>
-                    <Text style={[reportStyle.tableCellText, reportStyle.columnLoss, reportStyle.lossAmount]}>
-                      ₱{item.estimatedLoss.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Text>
-                    <Text style={[reportStyle.tableCellText, reportStyle.columnReason]} numberOfLines={2}>
-                      {item.reason}
-                    </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={reportStyle.tableContainer}>
+                  {/* Table Header */}
+                  <View style={reportStyle.tableHeader}>
+                    <Text style={[reportStyle.tableHeaderText, reportStyle.columnProduct]}>Product</Text>
+                    <Text style={[reportStyle.tableHeaderText, reportStyle.columnQuantity]}>Qty</Text>
+                    <Text style={[reportStyle.tableHeaderText, reportStyle.columnLoss]}>Est. Loss</Text>
+                    <Text style={[reportStyle.tableHeaderText, reportStyle.columnReason]}>Reason</Text>
                   </View>
-                ))}
-              </View>
-              
-            </ScrollView>
-            <View>
-{chartLoading ? (
-  <View style={styles.loaderContainer}>
-    <ActivityIndicator size="large" color="#b91c1c" />
-    <Text style={styles.loadingText}>Loading chart...</Text>
-  </View>
-) : (
-  <>
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
-    >
-      <PieChart
-        data={
-          productCategory.length > 0
-            ? productCategory
-                .filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0)
-                .map((item: any, index: any) => ({
-                  name: item.category || 'Unknown',
-                  population: parseFloat(item.total_amount || 0),
-                  color: [
-                    '#dc2626', '#ea580c', '#ca8a04', '#16a34a', 
-                    '#0891b2', '#2563eb', '#7c3aed', '#c026d3',
-                    '#db2777', '#e11d48', '#f97316', '#84cc16'
-                  ][index % 12],
-                  legendFontColor: '#6b7280',
-                  legendFontSize: 12,
-                }))
-            : [{ name: 'No Data', population: 1, color: '#e5e7eb', legendFontColor: '#9ca3af', legendFontSize: 12 }]
-        }
-        width={Math.max(350, productCategory.filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0).length * 40)}
-        height={280}
-        chartConfig={{
-          color: (opacity = 1) => `rgba(185, 28, 28, ${opacity})`,
-          labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-        }}
-        accessor="population"
-        backgroundColor="transparent"
-        paddingLeft="15"
-        absolute
-        hasLegend={true}
-        style={{
-          paddingVertical: 20,
-        }}
-      />
-    </ScrollView>
 
-    {/* Summary Stats */}
-    {productCategory.length > 0 && productCategory.some((item: any) => item.total_amount && parseFloat(item.total_amount) > 0) && (
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <MaterialIcons name="arrow-upward" size={16} color="#059669" />
-          <Text style={styles.statLabel}>Highest</Text>
-          <Text style={styles.statValue}>
-            {formatCurrency(Math.max(...productCategory
-              .filter((item: any) => item.total_amount)
-              .map((item: any) => parseFloat(item.total_amount || 0))))}
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <MaterialIcons name="arrow-downward" size={16} color="#dc2626" />
-          <Text style={styles.statLabel}>Lowest</Text>
-          <Text style={styles.statValue}>
-            {formatCurrency(Math.min(...productCategory
-              .filter((item: any) => item.total_amount)
-              .map((item: any) => parseFloat(item.total_amount || 0))))}
-          </Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <MaterialIcons name="functions" size={16} color="#6366f1" />
-          <Text style={styles.statLabel}>Average</Text>
-          <Text style={styles.statValue}>
-            {(() => {
-              const validItems = productCategory.filter((item: any) => item.total_amount && parseFloat(item.total_amount) > 0);
-              const total = validItems.reduce((sum: number, item: any) => sum + parseFloat(item.total_amount || 0), 0);
-              return formatCurrency(total / validItems.length);
-            })()}
-          </Text>
-        </View>
-      </View>
-    )}
-  </>
-)}
-              </View>
+                  {lossReport.length === 0 ? (
+                    <View
+                      style={{
+                        paddingVertical: 24,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '600',
+                          color: '#6b7280',
+                        }}
+                      >
+                        Nothing to show
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          color: '#9ca3af',
+                          marginTop: 4,
+                          textAlign: 'center',
+                        }}
+                      >
+                        No loss records available for the selected period.
+                      </Text>
+                    </View>
+                  ) : (
+                    lossReport.map((item: any, index: number) => (
+                      <View
+                        key={item.id}
+                        style={[
+                          reportStyle.tableRow,
+                          index % 2 === 0
+                            ? reportStyle.tableRowEven
+                            : reportStyle.tableRowOdd,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            reportStyle.tableCellText,
+                            reportStyle.columnProduct,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {item.product}
+                        </Text>
+
+                        <Text
+                          style={[
+                            reportStyle.tableCellText,
+                            reportStyle.columnQuantity,
+                          ]}
+                        >
+                          {item.quantity}
+                        </Text>
+
+                        <Text
+                          style={[
+                            reportStyle.tableCellText,
+                            reportStyle.columnLoss,
+                            reportStyle.lossAmount,
+                          ]}
+                        >
+                          ₱{item.estimatedLoss.toLocaleString('en-US', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </Text>
+
+                        <Text
+                          style={[
+                            reportStyle.tableCellText,
+                            reportStyle.columnReason,
+                          ]}
+                          numberOfLines={2}
+                        >
+                          {item.reason}
+                        </Text>
+                      </View>
+                    ))
+                  )}
+
+                </View>
+                
+              </ScrollView>
+            </View>
+            <View>
+              {/* ARI IBUTANG ANG SALES BY CATEGROY */}
+              <CategorySalesTable />
+              <ProductSalesTable />
+            </View>
           </View>
         )}
 
@@ -1290,6 +1270,83 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#1a1a1a',
+  },
+
+  chartContainer: {
+    marginVertical: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  chartWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    minWidth: 600,
+  },
+  pieChartSection: {
+    paddingRight: 20,
+  },
+  pieChart: {
+    borderRadius: 16,
+  },
+  legendSection: {
+    flex: 1,
+    paddingLeft: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: '#e5e7eb',
+    maxHeight: 280,
+  },
+  legendTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  legendScroll: {
+    flex: 1,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 4,
+    borderRadius: 6,
+    backgroundColor: '#f9fafb',
+  },
+  legendLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  legendTextEmpty: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+  },
+  legendRight: {
+    alignItems: 'flex-end',
+  },
+  legendAmount: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  legendPercentage: {
+    fontSize: 11,
+    color: '#6b7280',
+    fontWeight: '600',
   },
 });
 
@@ -1901,9 +1958,6 @@ const topSellingStyle = StyleSheet.create({
 const reportStyle = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f1f5f9',
-    paddingHorizontal: 12,
-    paddingVertical: 16,
   },
   header: {
     backgroundColor: '#ffffff',
@@ -1952,6 +2006,8 @@ const reportStyle = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+    marginTop: 12,
+    maxWidth: '100%',
   },
   tableHeader: {
     flexDirection: 'row',
@@ -2011,3 +2067,5 @@ const reportStyle = StyleSheet.create({
     fontSize: 12,
   },
 });
+
+

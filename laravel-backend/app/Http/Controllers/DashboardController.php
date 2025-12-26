@@ -44,9 +44,9 @@ class DashboardController extends Controller
         $yearToUse = $selectedYear ?? $latestYear;
 
         $year = collect(DB::select("
-            SELECT DISTINCT YEAR(expense_created) AS year
-            FROM expenses
-            WHERE expense_created IS NOT NULL and owner_id = ?
+            SELECT DISTINCT YEAR(receipt_date) AS year
+            FROM receipt
+            WHERE receipt_date IS NOT NULL and owner_id = ?
             ORDER BY year DESC
         ", [$owner_id]))->pluck('year')->toArray();
         
@@ -332,50 +332,20 @@ class DashboardController extends Controller
 
 
         $stockAlert = DB::select("
-            SELECT p.name AS prod_name, p.prod_image, p.stock_limit,
-                
-                SUM(i.stock) AS total_stock,
-                
-                -- Usable stock (not expired)
-                SUM(CASE 
-                    WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
-                    THEN i.stock 
-                    ELSE 0 
-                END) AS remaining_stock,
-                
-                -- Expired stock
-                SUM(CASE 
-                    WHEN i.expiration_date <= CURDATE() 
-                    THEN i.stock 
-                    ELSE 0 
-                END) AS expired_stock,
-                
-                CASE
-                    WHEN SUM(CASE 
-                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
-                        THEN i.stock 
-                        ELSE 0 
-                    END) = 0 THEN 'Critical'
-                    WHEN SUM(CASE 
-                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
-                        THEN i.stock 
-                        ELSE 0 
-                    END) <= 3 THEN 'Critical'
-                    WHEN SUM(CASE 
-                        WHEN i.expiration_date IS NULL OR i.expiration_date > CURDATE() 
-                        THEN i.stock 
-                        ELSE 0 
-                    END) <= p.stock_limit THEN 'Reorder'
-                    ELSE 'Normal'
-                END AS status
-                
-            FROM products p
-            JOIN inventory i ON p.prod_code = i.prod_code
+            SELECT 
+                v.prod_code,
+                v.name AS prod_name,
+                p.prod_image,
+                v.current_stock as total_stock,
+                v.safety_stock,
+                v.reorder_point,
+                v.inventory_status as stock_status
+            FROM vw_inventory_status v
+            JOIN products p ON p.prod_code = v.prod_code
             WHERE p.owner_id = ?
-                AND p.prod_status = 'active'
-            GROUP BY p.prod_code, p.name, p.stock_limit, p.prod_image
-            HAVING status IN ('Critical', 'Reorder')
-            ORDER BY remaining_stock ASC
+            AND p.prod_status = 1
+            AND v.inventory_status IN ('Critical', 'Warning', 'Out of Stock')
+            ORDER BY v.current_stock ASC
         ", [$owner_id]);
 
 
@@ -566,6 +536,9 @@ class DashboardController extends Controller
             $owner_id, $latestYear,
             $owner_id
         ]);
+
+        
+
 
         return response()->json([
             'success' => true,

@@ -10,6 +10,7 @@ export default function TabsLayout() {
   const router = useRouter();
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unseenCount, setUnseenCount] = useState(0);
   const pollingInterval = useRef<any>(null);
 
   useEffect(() => {
@@ -49,25 +50,44 @@ export default function TabsLayout() {
 
       const data = await response.json();
       
+      console.log("fetchUnreadCount response:", data);
+
       if (response.ok && data.success) {
-        setUnreadCount(data.unread_count);
+        setUnseenCount(Number(data.unseen_count) || 0);
       }
     } catch (error) {
-      console.error('Error fetching unread count:', error);
+      console.error('Error fetching unseen count:', error);
     }
   };
 
-  const handleNotificationPress = () => {
+  const handleNotificationPress = async () => {
     if (!ownerEmail) {
       Alert.alert('Error', 'Email not found. Please login again.');
       return;
     }
-    
-    router.push({
-      pathname: "/(tabs)/notification",
-      params: { email: ownerEmail }
-    });
+
+    try {
+      
+      await fetch(`${API}/notifications/bell-clicked`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ownerEmail }),
+      });
+
+      // 2️⃣ Navigate to the notifications page
+      router.push({
+        pathname: "/(tabs)/notification",
+        params: { email: ownerEmail }
+      });
+
+      // 3️⃣ Optional: update the unseenCount locally to 0
+      setUnseenCount(0);
+
+    } catch (error) {
+      console.error('Failed to mark notifications as seen:', error);
+    }
   };
+
 
   return (
     <Tabs
@@ -89,41 +109,43 @@ export default function TabsLayout() {
               style={{ position: "relative" }}
             >
               <Ionicons name="notifications-outline" size={26} color="#ffffff" />
-              {unreadCount > 0 && (
+              {unseenCount > 0 && (
                 <View style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -4,
-                  backgroundColor: "#ff4444",
-                  borderRadius: 10,
-                  minWidth: 20,
-                  height: 20,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  paddingHorizontal: 4,
-                }}>
-                  <Text style={{ color: "#fff", fontSize: 10, fontWeight: "bold" }}>
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </Text>
-                </View>
-              )}
+                    position: "absolute",
+                    top: -4,
+                    right: -4,
+                    backgroundColor: '#ff4444',
+                    borderRadius: 10,
+                    minWidth: 18,
+                    height: 18,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    paddingHorizontal: 4,
+                    zIndex: 999,
+                  }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>
+                      {unseenCount > 99 ? '99+' : unseenCount}
+                    </Text>
+                  </View>
+                )}
             </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => {
-              if (!ownerEmail) {
-                Alert.alert("Error", "Unable to load profile. Please login again.");
-                return;
-              }
+            <TouchableOpacity
+              onPress={() => {
+                if (!ownerEmail) {
+                  Alert.alert("Error", "Unable to load profile. Please login again.");
+                  return;
+                }
 
-              router.push({
-                pathname: "/(tabs)/profile",
-                params: { email: ownerEmail }
-              });
-            }}
-          >
-            <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
-          </TouchableOpacity>
+                router.push({
+                  pathname: "/(tabs)/profile",
+                  params: { email: ownerEmail }
+                });
+              }}
+            >
+              <Ionicons name="person-circle-outline" size={28} color="#ffffff" />
+            </TouchableOpacity>
 
           </View>
         ),
@@ -181,6 +203,22 @@ export default function TabsLayout() {
         options={{ 
           title: "Notification",
           tabBarLabel: "Notification",
+          href: null,
+        }} 
+      />
+      <Tabs.Screen 
+        name="categorysaletable" 
+        options={{ 
+          title: "Category Sales",
+          tabBarLabel: "Category Sales",
+          href: null,
+        }} 
+      />
+      <Tabs.Screen 
+        name="productsaletable" 
+        options={{ 
+          title: "Product Sales",
+          tabBarLabel: "Product Sales",
           href: null,
         }} 
       />

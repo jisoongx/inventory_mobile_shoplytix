@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\DB;
 
 class StoreController extends Controller
 {
-
     public function index(Request $request)
     {
         $owner_id = $request->input('owner_id');
@@ -34,12 +33,16 @@ class StoreController extends Controller
                 p.name AS prod_name,
                 p.prod_image,
                 p.selling_price,
+                p.cost_price,
+                p.vat_category,
+                p.barcode,
                 COALESCE(SUM(i.stock), 0) AS stock
             FROM products p 
             LEFT JOIN inventory i ON p.prod_code = i.prod_code 
             WHERE p.owner_id = ?
             AND p.prod_status = 'active'
-            GROUP BY p.prod_code, p.name, p.prod_image, p.selling_price
+            GROUP BY p.prod_code, p.name, p.prod_image, p.selling_price, p.cost_price, p.vat_category, p.barcode
+            ORDER BY p.name ASC
         ", [$owner_id]);
 
         $baseUrl = env('APP_API_URL');
@@ -65,9 +68,9 @@ class StoreController extends Controller
     {
         $owner_id = $request->input('owner_id');
         $amount_paid = $request->input('amount_paid');
-        $items = $request->input('items'); 
+        $items = $request->input('items');
 
-        // Better validation
+        // Validation
         if (!$owner_id) {
             return response()->json([
                 'success' => false,
@@ -128,7 +131,7 @@ class StoreController extends Controller
                 }
             }
 
-            // 1. Create Receipt
+            // Create Receipt
             $receipt_id = DB::table('receipt')->insertGetId([
                 'receipt_date' => now(),
                 'owner_id' => $owner_id,
@@ -144,6 +147,11 @@ class StoreController extends Controller
                 if ($qtyNeeded <= 0) {
                     continue;
                 }
+
+                // Get product details for VAT calculation
+                $product = DB::table('products')
+                    ->where('prod_code', $prod_code)
+                    ->first();
 
                 $inventoryRows = DB::table('inventory')
                     ->where('prod_code', $prod_code)
@@ -170,6 +178,12 @@ class StoreController extends Controller
 
                     $subtract = min($available, $qtyNeeded);
 
+                    // Calculate VAT amount: cost_price * quantity * 12% (only for vat_inclusive)
+                    $vatAmount = 0;
+                    if ($product->vat_category === 'vat_inclusive') {
+                        $vatAmount = $product->cost_price * $subtract * 0.12;
+                    }
+
                     // Deduct stock
                     DB::table('inventory')
                         ->where('inven_code', $inv->inven_code)
@@ -177,15 +191,19 @@ class StoreController extends Controller
                             'stock' => $available - $subtract
                         ]);
 
-                    // Create receipt_item per inventory row used - ADD prod_code HERE
+                    // Get item discount values
+                    $itemDiscountType = isset($item['item_discount_type']) ? $item['item_discount_type'] : null;
+                    $itemDiscountValue = isset($item['item_discount_value']) ? $item['item_discount_value'] : 0;
+
+                    // Create receipt_item
                     DB::table('receipt_item')->insert([
                         'receipt_id' => $receipt_id,
                         'inven_code' => $inv->inven_code,
-                        'prod_code' => $prod_code, // ← THIS IS THE FIX
+                        'prod_code' => $prod_code,
                         'item_quantity' => $subtract,
-                        'vat_amount' => 0,
-                        'item_discount_type' => null,
-                        'item_discount_value' => 0
+                        'vat_amount' => $vatAmount,
+                        'item_discount_type' => $itemDiscountType,
+                        'item_discount_value' => $itemDiscountValue
                     ]);
 
                     $qtyNeeded -= $subtract;
@@ -221,7 +239,4 @@ class StoreController extends Controller
 
         return response()->file($fullPath);
     }
-
-
-
 }

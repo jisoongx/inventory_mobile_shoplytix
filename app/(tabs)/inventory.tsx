@@ -1,27 +1,59 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  StyleSheet,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
-import { Picker } from "@react-native-picker/picker";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { API } from "../constants";
 
+interface Category {
+  category_id: number;
+  category_name: string;
+}
+
+interface Product {
+  prod_code: number;
+  barcode: string;
+  name: string;
+  cost_price: number;
+  selling_price: number;
+  stock_limit: number;
+  prod_image: string | null;
+  unit: string;
+  category_name?: string;
+  category_id?: number;
+  prod_status: string;
+  current_stock: number;
+}
+
 export default function InventoryScreen() {
-  const [products, setProducts] = useState([]);
-  const [filter, setFilter] = useState("all");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
 
   useEffect(() => {
-    fetchInventoryData();
+    fetchData();
   }, []);
+
+  const fetchData = async () => {
+    await Promise.all([fetchInventoryData(), fetchCategories()]);
+  };
 
   const fetchInventoryData = async () => {
     try {
@@ -32,40 +64,110 @@ export default function InventoryScreen() {
       }
 
       const url = `${API}/inventory?owner_id=${ownerId}`;
+      console.log("Fetching from:", url);
       const response = await fetch(url);
 
-      if (!response.ok) throw new Error("HTTP error " + response.status);
+      if (!response.ok) {
+        console.error("Inventory fetch failed:", response.status);
+        throw new Error("HTTP error " + response.status);
+      }
 
       const data = await response.json();
+      console.log("Inventory response:", data);
+      console.log("Products count:", data.products?.length);
 
       if (data.success && Array.isArray(data.products)) {
         setProducts(data.products);
+        console.log("Products set:", data.products.length);
       } else {
+        console.warn("No products in response");
         setProducts([]);
       }
     } catch (error) {
+      console.error("Inventory fetch error:", error);
       Alert.alert("Error", "Failed to load inventory data.");
     } finally {
       setLoading(false);
     }
   };
 
-  const getRowStatus = (item) => {
+  const fetchCategories = async () => {
+    try {
+      const ownerId = await AsyncStorage.getItem("owner_id");
+      if (!ownerId) return;
+
+      const url = `${API}/inventory/categories?owner_id=${ownerId}`;
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        console.error("Categories fetch failed:", response.status);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.success && Array.isArray(data.categories)) {
+        setCategories(data.categories);
+        console.log("Categories loaded:", data.categories.length);
+      }
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    }
+  };
+
+  const getRowStatus = (item: Product) => {
     if (item.current_stock <= 0) return "out_of_stock";
     if (item.current_stock <= item.stock_limit) return "low_stock";
     return "healthy";
   };
 
-  const openQuickRestock = (product) => {
+  const openQuickRestock = (product: Product) => {
     console.log("Quick Restock:", product.prod_code);
   };
 
   const filteredProducts = products.filter((p) => {
+    // Status filter
     const status = getRowStatus(p);
-    return filter === "all" ? true : filter === status;
+    const matchesStatus = statusFilter === "all" || statusFilter === status;
+
+    // Category filter
+    const matchesCategory =
+      categoryFilter === "all" ||
+      (p.category_id && p.category_id.toString() === categoryFilter);
+
+    // Search filter
+    const matchesSearch =
+      searchQuery === "" ||
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.barcode.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesStatus && matchesCategory && matchesSearch;
   });
 
-  const renderCard = ({ item }) => {
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
+
+  const getStatusLabel = () => {
+    switch (statusFilter) {
+      case "out_of_stock":
+        return "Out of Stock";
+      case "low_stock":
+        return "Low Stock";
+      case "healthy":
+        return "Healthy";
+      default:
+        return "All";
+    }
+  };
+
+  const getCategoryLabel = () => {
+    if (categoryFilter === "all") return "All";
+    const cat = categories.find((c) => c.category_id.toString() === categoryFilter);
+    return cat ? cat.category_name : "All";
+  };
+
+  const renderCard = ({ item }: { item: Product }) => {
     const status = getRowStatus(item);
 
     return (
@@ -128,15 +230,8 @@ export default function InventoryScreen() {
             {item.current_stock}
           </Text>
           {item.stock_limit > 0 && (
-            <Text style={styles.stockLimit}>Limit: {item.stock_limit}</Text>
+            <Text style={styles.stockLimit}>Min: {item.stock_limit}</Text>
           )}
-
-          <TouchableOpacity
-            style={styles.restockButton}
-            onPress={() => openQuickRestock(item)}
-          >
-            <MaterialIcons name="add-circle" size={28} color="#960204" />
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -155,24 +250,60 @@ export default function InventoryScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-
-        <View style={styles.tipContainer}>
-          <MaterialIcons name="touch-app" size={16} color="#666" />
-          <Text style={styles.tip}>Tap any product to restock quickly.</Text>
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <MaterialIcons name="search" size={20} color="#666" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by name or barcode..."
+            placeholderTextColor="#999"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+          />
+          {searchQuery !== "" && (
+            <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+              <MaterialIcons name="close" size={20} color="#666" />
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Filter */}
-        <View style={styles.filterContainer}>
-          <MaterialIcons name="filter-list" size={18} color="#666" />
-          <Picker
-            selectedValue={filter}
-            style={styles.picker}
-            onValueChange={(v) => setFilter(v)}
-          >
-            <Picker.Item label="All Products" value="all" />
-            <Picker.Item label="Out of Stock" value="out_of_stock" />
-            <Picker.Item label="Low Stock" value="low_stock" />
-          </Picker>
+        {/* Filters Row */}
+        <View style={styles.filtersRow}>
+          {/* Status Filter */}
+          <View style={styles.filterWrapper}>
+            <Text style={styles.filterLabel}>Status</Text>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowStatusModal(true)}
+            >
+              <MaterialIcons name="filter-list" size={16} color="#666" />
+              <Text style={styles.filterButtonText}>{getStatusLabel()}</Text>
+              <MaterialIcons name="arrow-drop-down" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Category Filter */}
+          <View style={styles.filterWrapper}>
+            <Text style={styles.filterLabel}>Category</Text>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowCategoryModal(true)}
+            >
+              <MaterialIcons name="category" size={16} color="#666" />
+              <Text style={styles.filterButtonText} numberOfLines={1}>
+                {getCategoryLabel()}
+              </Text>
+              <MaterialIcons name="arrow-drop-down" size={20} color="#666" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Results Count */}
+        <View style={styles.resultsContainer}>
+          <Text style={styles.resultsText}>
+            {filteredProducts.length} product{filteredProducts.length !== 1 ? "s" : ""} found
+          </Text>
         </View>
       </View>
 
@@ -189,13 +320,134 @@ export default function InventoryScreen() {
             <MaterialIcons name="inventory" size={80} color="#ddd" />
             <Text style={styles.emptyTitle}>No products found</Text>
             <Text style={styles.emptyText}>
-              {filter !== "all"
+              {searchQuery !== ""
+                ? "No matches for your search"
+                : statusFilter !== "all" || categoryFilter !== "all"
                 ? "Try adjusting your filters"
                 : "Start by adding products to your inventory"}
             </Text>
           </View>
         }
       />
+
+      {/* Status Filter Modal */}
+      <Modal
+        visible={showStatusModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowStatusModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowStatusModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Status</Text>
+              <TouchableOpacity onPress={() => setShowStatusModal(false)}>
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              {[
+                { value: "all", label: "All Products" },
+                { value: "out_of_stock", label: "Out of Stock" },
+                { value: "low_stock", label: "Low Stock" },
+                { value: "healthy", label: "Healthy Stock" },
+              ].map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setStatusFilter(option.value);
+                    setShowStatusModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      statusFilter === option.value && styles.modalItemTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  {statusFilter === option.value && (
+                    <MaterialIcons name="check" size={20} color="#960204" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Category Filter Modal */}
+      <Modal
+        visible={showCategoryModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCategoryModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCategoryModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Filter by Category</Text>
+              <TouchableOpacity onPress={() => setShowCategoryModal(false)}>
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalList}>
+              <TouchableOpacity
+                style={styles.modalItem}
+                onPress={() => {
+                  setCategoryFilter("all");
+                  setShowCategoryModal(false);
+                }}
+              >
+                <Text
+                  style={[
+                    styles.modalItemText,
+                    categoryFilter === "all" && styles.modalItemTextActive,
+                  ]}
+                >
+                  All Categories
+                </Text>
+                {categoryFilter === "all" && (
+                  <MaterialIcons name="check" size={20} color="#960204" />
+                )}
+              </TouchableOpacity>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat.category_id}
+                  style={styles.modalItem}
+                  onPress={() => {
+                    setCategoryFilter(cat.category_id.toString());
+                    setShowCategoryModal(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.modalItemText,
+                      categoryFilter === cat.category_id.toString() &&
+                        styles.modalItemTextActive,
+                    ]}
+                  >
+                    {cat.category_name}
+                  </Text>
+                  {categoryFilter === cat.category_id.toString() && (
+                    <MaterialIcons name="check" size={20} color="#960204" />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -232,62 +484,123 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
   },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1a1a1a",
-  },
-  countBadge: {
-    backgroundColor: "#960204",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    minWidth: 44,
-    alignItems: "center",
-  },
-  countText: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  tipContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#f0f7ff",
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  tip: {
-    fontSize: 13,
-    color: "#555",
-    flex: 1,
-  },
-  filterContainer: {
+
+  /* SEARCH BAR */
+  searchContainer: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f8f9fa",
     borderRadius: 14,
-    paddingLeft: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 4,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: "#e0e0e0",
     gap: 8,
   },
-  picker: {
+  searchInput: {
     flex: 1,
-    height: 46,
+    fontSize: 15,
+    color: "#1a1a1a",
+    fontWeight: "500",
+    paddingVertical: Platform.OS === "android" ? 8 : 0,
+  },
+  clearButton: {
+    padding: 4,
+  },
+
+  /* FILTERS */
+  filtersRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  filterWrapper: {
+    flex: 1,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    marginBottom: 6,
+    marginLeft: 4,
+  },
+  filterButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8f9fa",
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    gap: 8,
+  },
+  filterButtonText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1a1a1a",
+  },
+
+  /* MODAL */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    width: "100%",
+    maxHeight: "70%",
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#1a1a1a",
+  },
+  modalList: {
+    maxHeight: 400,
+  },
+  modalItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  modalItemText: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "500",
+  },
+  modalItemTextActive: {
+    color: "#960204",
+    fontWeight: "700",
+  },
+
+  /* RESULTS COUNT */
+  resultsContainer: {
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  resultsText: {
+    fontSize: 13,
+    color: "#666",
+    fontWeight: "500",
   },
 
   /* LIST */
@@ -415,6 +728,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontWeight: "600",
   },
   stockValue: {
     fontSize: 24,
@@ -431,10 +745,7 @@ const styles = StyleSheet.create({
   stockLimit: {
     fontSize: 10,
     color: "#aaa",
-    marginBottom: 8,
-  },
-  restockButton: {
-    padding: 4,
+    fontWeight: "500",
   },
 
   /* EMPTY STATE */
@@ -457,4 +768,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 20,
   },
-});
+});    
